@@ -34,8 +34,7 @@ public static class Updates
             return uri;
         }
         var body=root.TryGetProperty("body",out var description)?description.GetString()??"":"";
-        var heading="## "+Localization.Language;var section=body.Split(heading+"\n",StringSplitOptions.None);
-        var notes=section.Length>1?section[1].Split("\n## ")[0].Trim():body;
+        var notes=ReleaseNotes.ForLanguage(body,Localization.Language);
         return new(version, Find(Asset), Find(Asset+".manifest.json"),Find(Asset+".manifest.sig"),notes);
     }
     public static async Task Install(Release release,IProgress<long>? progress=null)
