@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     public MainWindow() : this(!Environment.GetCommandLineArgs().Contains("--no-session")) { }
     public MainWindow(bool restoreSession)
     {
-        Localization.Initialize(); InitializeComponent();Width=Math.Min(1640,SystemParameters.WorkArea.Width*0.94);Height=Math.Min(1040,SystemParameters.WorkArea.Height*0.94);SizeChanged+=(_,_)=>CompactSidebar=ActualHeight<1040;InitializeDraftSaving();BuildFeatures();RefreshSharedProfiles(); InitializePermissions(); RenderPlayers([]); RefreshColumnHeaders();Closed+=(_,_)=>availabilityTray?.Dispose();
+        Localization.Initialize(); InitializeComponent();Width=Math.Min(1640,SystemParameters.WorkArea.Width*0.94);Height=Math.Min(1040,SystemParameters.WorkArea.Height*0.94);Tabs.SizeChanged+=(_,e)=>{var compact=e.NewSize.Height<780;if(CompactSidebar!=compact){CompactSidebar=compact;if(Tabs.Template.FindName("NavigationScroll",Tabs) is ScrollViewer navigation)navigation.ScrollToTop();}};InitializeDraftSaving();BuildFeatures();RefreshSharedProfiles(); InitializePermissions(); RenderPlayers([]); RefreshColumnHeaders();Closed+=(_,_)=>availabilityTray?.Dispose();
         VersionLabel.Text = L("developmentVersion");
         AboutVersion.Text="Squad Server Manager · "+System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion.Split('+')[0];
         if(restoreSession)ContentRendered+=async(_,_)=>{if(startupUpdatesChecked)return;startupUpdatesChecked=true;await CheckAppUpdates(true);};

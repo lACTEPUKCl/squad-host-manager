@@ -354,12 +354,13 @@
             </StackPanel></ScrollViewer></Border>
             </Grid>
         </Grid>
+<Border Grid.Row="1" Panel.ZIndex="10" VerticalAlignment="Bottom" Margin="240,0,364,16" Padding="12" CornerRadius="12" Background="{StaticResource PanelBrush}" Visibility="{Binding Visibility,ElementName=ErrorPanel}">            <Expander x:Name="ErrorPanel" Header="{DynamicResource details}" MaxHeight="160" Visibility="Collapsed" Margin="0">
+                <TextBox x:Name="ErrorDetails" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="100" VerticalScrollBarVisibility="Auto" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+            </Expander></Border>
         <StackPanel Grid.Row="2" Margin="0,16,0,0">
             <ProgressBar x:Name="Activity" Height="3" IsIndeterminate="True" Visibility="Hidden" Margin="0,0,0,10" />
             <TextBlock x:Name="Status" Text="{DynamicResource noConnection}" TextWrapping="Wrap" Width="192" HorizontalAlignment="Left" FontSize="12" LineHeight="18" />
-            <Expander x:Name="ErrorPanel" Header="{DynamicResource details}" Visibility="Collapsed" Margin="0,6,0,0">
-                <TextBox x:Name="ErrorDetails" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="100" VerticalScrollBarVisibility="Auto" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
-            </Expander>
+
         </StackPanel>
     </Grid>
     </Grid>
