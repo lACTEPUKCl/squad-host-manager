@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="108" viewBox="0 0 300 108" role="img" aria-labelledby="title">
+  <title id="title">Squad Server Manager</title>
+  <g transform="matrix(1.38 0 0 1.38 -34.5 -48.3)">
+    <path fill="#EEF1E8" d="M63 35 L72 59 L215 59 L69 66 L63 49 L58 66 L43 66 L54 73 L44 94 L62 78 L30 112 L48 75 L25 59 L54 58 Z"/>
+  </g>
+  <text x="80" y="69" fill="#EEF1E8" font-family="Bahnschrift, Segoe UI, sans-serif" font-size="23" font-stretch="semi-condensed" font-weight="600">Squad Server</text>
+  <text x="80" y="94" fill="#EEF1E8" font-family="Bahnschrift, Segoe UI, sans-serif" font-size="23" font-stretch="semi-condensed" font-weight="600">Manager</text>
+</svg>

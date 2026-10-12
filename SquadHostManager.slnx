@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SquadHostManager.Core/SquadHostManager.Core.csproj" />
+    <Project Path="src/SquadHostManager.Desktop/SquadHostManager.Desktop.csproj" />
+    <Project Path="src/SquadHostManager.Service/SquadHostManager.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SquadHostManager.Tests/SquadHostManager.Tests.csproj" />
+  </Folder>
+</Solution>

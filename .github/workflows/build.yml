@@ -1,0 +1,63 @@
+name: Build and verify
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build embedded hosting installers
+        run: |
+          dotnet publish src/SquadHostManager.Service -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/coordinator-win
+          dotnet publish src/SquadHostManager.Service -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/coordinator-linux-x64
+          dotnet publish src/SquadHostManager.Service -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -o artifacts/coordinator-linux-arm64
+      - run: dotnet test tests/SquadHostManager.Tests -c Release
+      - run: dotnet build src/SquadHostManager.Desktop -c Release
+      - run: dotnet build tools/ReleaseSigner -c Release
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test tests/SquadHostManager.Tests -c Release
+      - run: docker build -t squad-host-manager:test .
+  package:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [verify, linux]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build candidate for owner review
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $releaseVersion = $env:RELEASE_TAG.TrimStart('v')
+          if ($releaseVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
+          dotnet publish src/SquadHostManager.Service -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=$releaseVersion -o artifacts/coordinator-win
+          dotnet publish src/SquadHostManager.Service -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=$releaseVersion -o artifacts/coordinator-linux-x64
+          dotnet publish src/SquadHostManager.Service -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=$releaseVersion -o artifacts/coordinator-linux-arm64
+          dotnet publish src/SquadHostManager.Desktop -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=$releaseVersion -o artifacts/windows
+          dotnet publish src/SquadHostManager.Desktop -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:FullPackage=true -p:Version=$releaseVersion -o artifacts/windows-full
+          Copy-Item artifacts/windows-full/SquadHostManager.exe artifacts/windows/SquadHostManager-Full.exe
+          Copy-Item artifacts/coordinator-win/SquadHostManager.Service.exe artifacts/windows/SquadHostManager.Service-win-x64.exe
+          Copy-Item artifacts/coordinator-linux-x64/SquadHostManager.Service artifacts/windows/SquadHostManager.Service-linux-x64
+          Copy-Item artifacts/coordinator-linux-arm64/SquadHostManager.Service artifacts/windows/SquadHostManager.Service-linux-arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-candidate
+          path: artifacts/windows/*
+          retention-days: 14
