@@ -51,6 +51,12 @@ Management runs on your computer. No extra VPS is needed in this mode. Keep the 
 
 The VPS stores settings and manages hosting. Squad runs on a separately rented Cherry host. You can remove the management service from the VPS through the app settings.
 
+## Recover owner access
+
+After setup, save your connection file from **Settings → Connection details**. It contains the owner password; keep it private.
+
+If you reinstall the app, select **Open connection file** on the login screen. If you have lost the file too, select **Recover access via SSH**, enter your VPS SSH credentials and the service port you chose during setup (default: 18443). The app restores access from the existing installation without restarting it.
+
 ## Start a server
 
 1. Wait for the host to become ready.

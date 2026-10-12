@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     public MainWindow() : this(!Environment.GetCommandLineArgs().Contains("--no-session")) { }
     public MainWindow(bool restoreSession)
     {
-        Localization.Initialize(); InitializeComponent();Width=Math.Min(1640,SystemParameters.WorkArea.Width*0.94);Height=Math.Min(1040,SystemParameters.WorkArea.Height*0.94);InitializeDraftSaving();BuildFeatures();RefreshSharedProfiles(); InitializePermissions(); RenderPlayers([]); RefreshColumnHeaders();Closed+=(_,_)=>availabilityTray?.Dispose();
+        Localization.Initialize(); InitializeComponent();Width=Math.Min(1640,SystemParameters.WorkArea.Width*0.94);Height=Math.Min(1040,SystemParameters.WorkArea.Height*0.94);SizeChanged+=(_,_)=>CompactSidebar=ActualHeight<1040;InitializeDraftSaving();BuildFeatures();RefreshSharedProfiles(); InitializePermissions(); RenderPlayers([]); RefreshColumnHeaders();Closed+=(_,_)=>availabilityTray?.Dispose();
         VersionLabel.Text = L("developmentVersion");
         AboutVersion.Text="Squad Server Manager · "+System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion.Split('+')[0];
         if(restoreSession)ContentRendered+=async(_,_)=>{if(startupUpdatesChecked)return;startupUpdatesChecked=true;await CheckAppUpdates(true);};
@@ -247,7 +247,7 @@ public partial class MainWindow : Window
         catch(RequestException error) when(error.Code is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden){throw new InputException(L("invitationRejected"));}
         rememberedInvitation=original;await Connect(login);
     }
-    private async void LoginClick(object sender, RoutedEventArgs e) => await Safe(async () => { if(string.IsNullOrWhiteSpace(Username.Text)||AccountPassword.Password.Length==0)throw new InputException(L("loginFieldsRequired"));certificateSha256=SharedHostingProfiles.Read().FirstOrDefault(p=>p.Endpoint==BaseUri().ToString())?.CertificateSha256;using var client = HostingTransport.Client(BaseUri(),certificateSha256);var login=await Post<SessionResponse>("api/login", new LoginRequest(Username.Text, AccountPassword.Password), client);rememberedInvitation=null;await Connect(login); });
+    private async void LoginClick(object sender, RoutedEventArgs e) => await Safe(async () => { if(string.IsNullOrWhiteSpace(Username.Text)||AccountPassword.Password.Length==0)throw new InputException(L("loginFieldsRequired"));certificateSha256=SharedHostingProfiles.Read().FirstOrDefault(p=>p.Endpoint==BaseUri().ToString())?.CertificateSha256;using var client = HostingTransport.Client(BaseUri(),certificateSha256);var login=await Post<SessionResponse>("api/login", new LoginRequest(Username.Text, AccountPassword.Password), client);rememberedInvitation=null;await Connect(login);if(login.IsAdmin && !PersonalHosting){SharedHostingProfiles.Save(new(BaseUri().ToString(),certificateSha256,AccountPassword.Password,"",BaseUri().Host));RefreshSharedProfiles();} });
     private async void RefreshClick(object sender, RoutedEventArgs e) => await Safe(async () => { using var response=await http!.GetAsync("api/pool?refresh=true"); await Check(response); pool=(await response.Content.ReadFromJsonAsync<PoolView>())!; RenderPool(); });
     private async void StartClick(object sender, RoutedEventArgs e) => await Safe(Start);
     private async void StopClick(object sender, RoutedEventArgs e) => await Safe(async () => {

@@ -66,7 +66,7 @@
                                 <TextBox x:Name="Username" Padding="12,8" Text="admin" Margin="0,8,0,16"/>
                                 <Label Content="{DynamicResource accountPassword}" Target="{Binding ElementName=AccountPassword}" Padding="0"/>
                                 <PasswordBox x:Name="AccountPassword" Padding="12,8" Margin="0,8,0,18"/>
-                                <Button Style="{StaticResource PrimaryButton}" Content="{DynamicResource login}" Click="LoginClick" HorizontalAlignment="Left"/>
+                                <WrapPanel><Button Style="{StaticResource PrimaryButton}" Content="{DynamicResource login}" Click="LoginClick" Margin="0,0,12,0"/><Button Content="{DynamicResource importConnection}" Click="ImportConnectionClick" Margin="0,0,12,0"/><Button Content="{DynamicResource recoverConnection}" Click="RecoverConnectionClick"/></WrapPanel>
                             </StackPanel></Expander>
                         </StackPanel></TabItem>
                         <TabItem Header="{DynamicResource personalPath}"><StackPanel Margin="0,24,0,0">
@@ -282,6 +282,7 @@
                         <Grid MinHeight="{Binding ViewportHeight,ElementName=SettingsScroll}"><StackPanel x:Name="SettingsContent" Margin="32,28" MaxWidth="760" HorizontalAlignment="Stretch" VerticalAlignment="Center">
 
                             <Button Content="{DynamicResource disconnect}" Click="LogoutClick" HorizontalAlignment="Left" Padding="14,7" Margin="0,0,0,20" MinHeight="38" />
+                            <Button Content="{DynamicResource connectionDetails}" Click="ConnectionDetailsClick" HorizontalAlignment="Left" Margin="0,0,0,16"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Visibility,ElementName=AdminPanel}" Value="Visible"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Button.Style></Button>
                             <Button x:Name="RemoveSharedHostingButton" Content="{DynamicResource sharedRemoveButton}" Click="RemoveSharedHostingClick" HorizontalAlignment="Left" Margin="0,12,0,0" Visibility="Collapsed"/><Button x:Name="PersonalAccountButton" Tag="edit" Content="{DynamicResource changeCherryKey}" Click="OwnCherryClick" HorizontalAlignment="Left" Margin="0,12,0,0" Visibility="Collapsed"/><TextBlock x:Name="HostingModeHelp" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,28"/><Expander Header="{DynamicResource connectionSettings}" Margin="0,0,0,16"><StackPanel><TextBlock Text="{DynamicResource connectionHelp}" TextWrapping="Wrap" Margin="0,12"/><TextBox Text="{Binding Text,ElementName=Endpoint,Mode=OneWay}" IsReadOnly="True" Padding="9,6"/></StackPanel></Expander>
                             <StackPanel x:Name="OwnerSettings" Visibility="Collapsed"><Expander Header="{DynamicResource maintenance}" Margin="0,0,0,16"><StackPanel><TextBlock Text="{DynamicResource hostMaintenanceHelp}" TextWrapping="Wrap" Margin="0,12"/>
                                 <Separator Margin="0,12,0,20" />

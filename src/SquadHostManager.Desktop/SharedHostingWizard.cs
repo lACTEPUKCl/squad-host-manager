@@ -27,7 +27,7 @@ public partial class MainWindow
     }
     private void SharedHostingClick(object sender,RoutedEventArgs e)=>new SharedHostingWizard(this,async profile=>
     {
-        SharedHostingProfiles.Save(profile);RefreshSharedProfiles();await ConnectSharedOwner(profile);Tabs.SelectedItem=AdminPanel;
+        SharedHostingProfiles.Save(profile);RefreshSharedProfiles();await ConnectSharedOwner(profile);Tabs.SelectedItem=AdminPanel;ShowConnectionDetails(profile);
     }).ShowDialog();
 }
 

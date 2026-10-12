@@ -20,7 +20,6 @@ public sealed class SshTrustRequired(string fingerprint):Exception("sharedTrustR
 }
 public sealed record HostingSshAccess(string? Password,string? KeyPath,string? KeyPassword,string? Fingerprint);
 public sealed record VdsInspection(string Architecture,string System,long FreeMegabytes,bool ExistingInstallation,string? ProjectId=null,string? TeamId=null);
-public sealed record SharedHostingProfile(string Endpoint,string CertificateSha256,string AdminPassword,string SshFingerprint,string Label);
 public sealed record HostingSetupProgress(string Stage,double? UploadPercent=null);
 
 public sealed partial class SharedHostingDeployment
