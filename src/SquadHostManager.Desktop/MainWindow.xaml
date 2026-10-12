@@ -1,0 +1,367 @@
+<Window x:Class="SquadHostManager.Desktop.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:SquadHostManager.Desktop" Title="Squad Server Manager" Icon="{StaticResource AppLogo}" WindowStyle="None" ResizeMode="CanResize" Width="1640" Height="1040" WindowState="Normal" WindowStartupLocation="CenterScreen" MinWidth="1240" MinHeight="680" FontFamily="{StaticResource DashboardFont}" FontSize="14" ThemeMode="Dark" Background="{StaticResource CanvasBrush}" Foreground="{StaticResource TextBrush}" Closing="OnClosing">
+    <WindowChrome.WindowChrome><WindowChrome CaptionHeight="36" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
+    <Window.Resources>
+
+        <Style x:Key="Heading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+        <Style x:Key="CaptionButton" TargetType="Button"><Setter Property="Width" Value="44"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="FontFamily" Value="Segoe MDL2 Assets"/><Setter Property="FontSize" Value="11"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{StaticResource MutedBrush}"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#2C3423"/><Setter Property="Foreground" Value="{StaticResource TextBrush}"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Foreground" Value="{StaticResource AccentBrush}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+    </Window.Resources>
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Height="36" Background="#11140E" BorderBrush="#252B20" BorderThickness="0,0,0,1"><DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+        <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="MinimizeWindowClick" ToolTip="{DynamicResource windowMinimize}" AutomationProperties.Name="{DynamicResource windowMinimize}"/>
+        <Button Click="MaximizeWindowClick" ToolTip="{DynamicResource windowMaximize}" AutomationProperties.Name="{DynamicResource windowMaximize}"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource CaptionButton}"><Setter Property="Content" Value="&#xE922;"/><Style.Triggers><DataTrigger Binding="{Binding WindowState,RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized"><Setter Property="Content" Value="&#xE923;"/></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+        <Button Style="{StaticResource CaptionButton}" Content="&#xE8BB;" Click="CloseWindowClick" ToolTip="{DynamicResource windowClose}" AutomationProperties.Name="{DynamicResource windowClose}"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center"><Image Source="{StaticResource AppLogo}" SnapsToDevicePixels="True" UseLayoutRounding="True" Width="22" Height="22" Margin="0,0,10,0"/><TextBlock Text="Squad Server Manager" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" Foreground="{StaticResource TextBrush}"/></StackPanel>
+        </DockPanel></Border>
+    <Grid>
+        <Border Width="240" HorizontalAlignment="Left" Visibility="{Binding Visibility,ElementName=Workspace}" IsHitTestVisible="False"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#202C16" Offset="0"/><GradientStop Color="#10110F" Offset="0.55"/></LinearGradientBrush></Border.Background></Border>
+        <Border Width="364" HorizontalAlignment="Right" Visibility="{Binding Visibility,ElementName=Workspace}" IsHitTestVisible="False"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#302F20" Offset="0"/><GradientStop Color="#12140F" Offset="0.55"/></LinearGradientBrush></Border.Background></Border>
+    <Grid Margin="24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="216"/><ColumnDefinition Width="*"/><ColumnDefinition Width="340"/></Grid.ColumnDefinitions>
+        <StackPanel VerticalAlignment="Center">
+            <Viewbox x:Name="BrandMark" Width="208" Height="75" Stretch="Uniform" HorizontalAlignment="Left" AutomationProperties.Name="Squad Server Manager">
+                <Grid Width="300" Height="108">
+                    <Path Fill="#EEF1E8" Data="M63 35 L72 59 L215 59 L69 66 L63 49 L58 66 L43 66 L54 73 L44 94 L62 78 L30 112 L48 75 L25 59 L54 58 Z"><Path.RenderTransform><MatrixTransform Matrix="1.38,0,0,1.38,-34.5,-48.3"/></Path.RenderTransform></Path>
+                    <StackPanel Margin="80,46,0,0" VerticalAlignment="Top" TextElement.FontFamily="Bahnschrift, Segoe UI" TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale"><TextBlock Text="Squad Server" FontSize="23" LineHeight="27" FontWeight="SemiBold" FontStretch="SemiCondensed"/><TextBlock Text="Manager" FontSize="23" LineHeight="27" FontWeight="SemiBold" FontStretch="SemiCondensed"/></StackPanel>
+                </Grid>
+            </Viewbox>
+            <TextBlock x:Name="VersionLabel" Visibility="Collapsed"/>
+        </StackPanel>
+        <TextBlock x:Name="PageHeading" Grid.Column="1" FontSize="18" FontWeight="Medium" Margin="24,0,0,0" VerticalAlignment="Center"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button x:Name="NoticeBell" Margin="0,0,12,0" Padding="10,6" Click="NoticeBellClick" Visibility="{Binding Visibility,ElementName=Workspace}" ToolTip="{DynamicResource notifications}" AutomationProperties.Name="{DynamicResource notifications}"><StackPanel Orientation="Horizontal"><Canvas Width="20" Height="20" VerticalAlignment="Center"><Path Data="M5 13 V9 Q5 4 10 4 Q15 4 15 9 V13 L17 15 H3 Z M8 17 Q10 20 12 17 M10 2 V4" Stroke="{Binding Foreground,RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Canvas><Border x:Name="NoticeBadge" Background="{StaticResource AccentBrush}" CornerRadius="10" Height="20" MinWidth="20" VerticalAlignment="Center" Margin="6,0,0,0" Padding="5,0" Visibility="Collapsed"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" LineHeight="14" TextAlignment="Center" x:Name="NoticeBadgeCount" Foreground="#14200D" FontSize="11" FontWeight="SemiBold"/></Border></StackPanel></Button><TextBlock x:Name="AccountLabel" Margin="0,0,18,0" VerticalAlignment="Center"/><ComboBox x:Name="LanguagePicker" Width="150" SelectionChanged="LanguageChanged" AutomationProperties.Name="{DynamicResource language}">
+                    <ComboBoxItem Tag="ru">Русский</ComboBoxItem>
+                    <ComboBoxItem Tag="en">English</ComboBoxItem>
+                    <ComboBoxItem Tag="de">Deutsch</ComboBoxItem>
+                    <ComboBoxItem Tag="es">Español</ComboBoxItem>
+                    <ComboBoxItem Tag="fr">Français</ComboBoxItem>
+                    <ComboBoxItem Tag="zh-Hans">简体中文</ComboBoxItem>
+                    <ComboBoxItem Tag="tr">Türkçe</ComboBoxItem>
+                </ComboBox></StackPanel></Grid>
+        <Grid Grid.Row="1">
+            <ScrollViewer x:Name="LoginPanel" VerticalScrollBarVisibility="Auto">
+                <StackPanel Width="760" HorizontalAlignment="Center" Margin="24,16,24,0">
+                    <TextBlock Text="{DynamicResource welcomeTitle}" FontSize="34" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                    <TextBlock Text="{DynamicResource welcomeIntro}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,28"/>
+                    <TabControl x:Name="LoginPaths" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Margin="0,0,0,18" SelectedIndex="0">
+                        <TabItem Header="{DynamicResource invitedPath}"><StackPanel Margin="0,24,0,0">
+                            <StackPanel x:Name="InvitationEntry"><TextBlock Text="{DynamicResource invitedHelp}" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                            <Label Content="{DynamicResource personalKey}" Target="{Binding ElementName=AccessKey}" Padding="0"/>
+                            <PasswordBox x:Name="AccessKey" Padding="12,10" Margin="0,8,0,18" KeyDown="AccessKeyKeyDown" AutomationProperties.Name="{DynamicResource personalKey}"/>
+                            <Button Style="{StaticResource PrimaryButton}" Content="{DynamicResource login}" Click="KeyLoginClick" HorizontalAlignment="Left" Padding="24,10"/>
+                            </StackPanel><Expander x:Name="ExistingOwnerLogin" Expanded="OwnerLoginExpanded" Collapsed="OwnerLoginCollapsed" Header="{DynamicResource existingAdminLogin}" Margin="0,28,0,0"><StackPanel Margin="0,16,0,0">
+                                <TextBlock Text="{DynamicResource existingAdminHelp}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,16"/>
+                                <Label Content="{DynamicResource managementAddress}" Padding="0" Target="{Binding ElementName=Endpoint}"/>
+                                <TextBox x:Name="Endpoint" Padding="12,8" Text="https://warzone-stats.duckdns.org:8443/shm/" Margin="0,8,0,16"/>
+                                <Label Content="{DynamicResource username}" Target="{Binding ElementName=Username}" Padding="0"/>
+                                <TextBox x:Name="Username" Padding="12,8" Text="admin" Margin="0,8,0,16"/>
+                                <Label Content="{DynamicResource accountPassword}" Target="{Binding ElementName=AccountPassword}" Padding="0"/>
+                                <PasswordBox x:Name="AccountPassword" Padding="12,8" Margin="0,8,0,18"/>
+                                <Button Style="{StaticResource PrimaryButton}" Content="{DynamicResource login}" Click="LoginClick" HorizontalAlignment="Left"/>
+                            </StackPanel></Expander>
+                        </StackPanel></TabItem>
+                        <TabItem Header="{DynamicResource personalPath}"><StackPanel Margin="0,24,0,0">
+                            <TextBlock Text="{DynamicResource cherryExplained}" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                            <TextBlock Text="{DynamicResource personalExplained}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,20"/>
+                            <Button Style="{StaticResource PrimaryButton}" Content="{DynamicResource connectOwnAccount}" Click="OwnCherryClick" HorizontalAlignment="Left" Padding="24,10"/>
+                            <TextBlock Text="{DynamicResource noRentDuringSetup}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,0"/>
+                        </StackPanel></TabItem>
+                    <TabItem Header="{DynamicResource sharedPath}"><StackPanel Margin="0,24,0,0"><TextBlock Text="{DynamicResource sharedPathHelp}" TextWrapping="Wrap" Margin="0,0,0,20"/><StackPanel x:Name="SharedOwnerEntry" Visibility="Collapsed" Margin="0,0,0,24"><TextBlock Text="{DynamicResource sharedSavedOwners}" Margin="0,0,0,8"/><TextBlock x:Name="SharedOwnerLabel" Margin="0,0,0,12"/><ComboBox x:Name="SharedOwners" DisplayMemberPath="Label" Margin="0,0,0,12"/><Button Content="{DynamicResource login}" Click="SharedOwnerLoginClick" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}"/><Button Content="{DynamicResource sharedRemoveButton}" Click="RemoveSharedHostingClick" HorizontalAlignment="Left" Margin="0,12,0,0"/></StackPanel><Button Content="{DynamicResource sharedSetupTitle}" Click="SharedHostingClick" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}" Padding="24,10"/><TextBlock Text="{DynamicResource noRentDuringSetup}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,0"/></StackPanel></TabItem></TabControl>
+                    <TextBlock x:Name="LoginFeedback" TextWrapping="Wrap" Foreground="#EAC58B" Margin="0,12,0,0"/>
+                </StackPanel>
+            </ScrollViewer>
+            <Grid x:Name="Workspace" Visibility="Collapsed"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="340"/></Grid.ColumnDefinitions><DockPanel Margin="0,0,24,0">
+                <DockPanel DockPanel.Dock="Top" Height="36" Margin="240,0,20,4">
+
+                    <TextBlock x:Name="OwnServerLabel" Text="{DynamicResource selectedServer}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="OwnServers" DisplayMemberPath="Name" SelectedValuePath="Id" SelectionChanged="OwnServerChanged" MinWidth="230" AutomationProperties.Name="{DynamicResource selectedServer}" />
+                    <TextBlock x:Name="OwnSingleName" VerticalAlignment="Center" Visibility="Collapsed"/>
+                </DockPanel>
+                <TabControl HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="Tabs" SelectionChanged="TabChanged" Style="{StaticResource DashboardTabs}">
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="SharedHostTab" Header="{DynamicResource shared}" Tag="M3 9 L10 3 17 9 M5 8 L5 17 8 17 8 12 12 12 12 17 15 17 15 8">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"><Grid Margin="24">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel>
+
+
+                            <TextBlock x:Name="HostStatus" Style="{StaticResource Heading}" TextWrapping="Wrap" />
+                        </DockPanel>
+                        <Grid x:Name="HostingLayout" Grid.Row="1" Margin="0,0,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel>
+                            <Border x:Name="LocationAlert" Visibility="Collapsed" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" Padding="16" Margin="0,0,0,20"><DockPanel><Button Content="{DynamicResource watchDismiss}" Click="DismissLocationAlert" DockPanel.Dock="Right" Margin="12,0,0,0"/><StackPanel><TextBlock Text="{DynamicResource watchAvailable}" FontWeight="SemiBold"/><TextBlock x:Name="LocationAlertText" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel></DockPanel></Border>
+                            <Border x:Name="SharedHostSummary" Visibility="Collapsed" Background="{StaticResource PanelBrush}" CornerRadius="12" Padding="24" Margin="0,0,0,24"><StackPanel>
+                                <TextBlock x:Name="SharedHostModel" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="SharedHostInfo" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,12,0,16"/>
+                                <TextBlock x:Name="SharedHostRate" FontSize="18" FontWeight="Medium" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap"/>
+                            </StackPanel></Border>
+                            <Border Visibility="{Binding Visibility,ElementName=HostLivePanel}" Background="#141711" CornerRadius="16" Padding="24" Margin="0,0,0,18"><StackPanel x:Name="HostLivePanel" Visibility="Collapsed">
+                                <TextBlock x:Name="HostLivePhase" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <ProgressBar x:Name="HostLiveActivity" IsIndeterminate="True" Height="5" Margin="0,0,0,10"/>
+                                <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock x:Name="HostLiveInfo" TextWrapping="Wrap" Margin="0,0,0,12"/><TextBlock x:Name="HostLiveTiming" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}"/></StackPanel>
+                                <ScrollViewer Grid.Column="2" MaxHeight="240" VerticalScrollBarVisibility="Auto" Focusable="False"><TextBlock x:Name="HostLiveJournal" TextWrapping="Wrap" Focusable="False" IsHitTestVisible="False" LineHeight="22"/></ScrollViewer></Grid>
+                                <Button x:Name="RetryHostButton" Visibility="Collapsed" Content="{DynamicResource retryHostPreparation}" Click="RetryHostClick" HorizontalAlignment="Left" Margin="0,16,0,0" Style="{StaticResource PrimaryButton}"/><Button x:Name="ReleaseEmptyHostButton" Visibility="Collapsed" Content="{DynamicResource release}" Click="ReleaseClick" HorizontalAlignment="Left" Margin="0,20,0,0"/>
+                            </StackPanel></Border>
+                            <TextBlock x:Name="RentalPermissionHelp" TextWrapping="Wrap" Margin="0,0,0,20" Visibility="Collapsed"/><StackPanel x:Name="RentalCitiesPanel" Margin="0,0,0,12"><TextBlock Text="{DynamicResource selectRentalCity}" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="AMD Ryzen 9950X" FontWeight="SemiBold" Margin="0,8"/><DockPanel><Button x:Name="LocationBell" Click="LocationBellClick" DockPanel.Dock="Right" Padding="10" Margin="10,0,0,0" ToolTip="{DynamicResource watchCitiesTitle}" AutomationProperties.Name="{DynamicResource watchCitiesTitle}"><Canvas Width="20" Height="20"><Path Data="M5 13 V9 Q5 4 10 4 Q15 4 15 9 V13 L17 15 H3 Z M8 17 Q10 20 12 17 M10 2 V4" Stroke="{Binding Foreground,RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Canvas></Button><Button Click="LocationsRefreshClick" DockPanel.Dock="Right" Padding="10" Margin="12,0,0,0" ToolTip="{DynamicResource refresh}" AutomationProperties.Name="{DynamicResource refresh}"><Canvas Width="18" Height="18"><Path Data="M15 6 A6 6 0 1 0 15 12 M15 2 V6 H11" Stroke="{Binding Foreground,RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas></Button><ComboBox x:Name="RentalCities" DisplayMemberPath="Display" MinWidth="0" SelectionChanged="RentalCitySelected"/></DockPanel><TextBlock x:Name="RentalOfferPrice" FontSize="36" FontWeight="Medium" Margin="0,22,0,6"/><TextBlock x:Name="RentalOfferAvailability" Foreground="{StaticResource AccentBrush}" FontSize="12" Margin="0,0,0,16"/><TextBlock x:Name="RentalOffer" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/><Button x:Name="RentHostButton" Style="{StaticResource PrimaryButton}" Content="{DynamicResource rentHost}" Click="RentHostClick" HorizontalAlignment="Left" Padding="18,9" Margin="0,8,0,12"/><TextBlock Text="{DynamicResource rentalCityHelp}" TextWrapping="Wrap" Margin="0,8"/></StackPanel><TextBlock x:Name="RentalDescription" TextWrapping="Wrap" FontSize="17" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="RentalCapacity" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <TextBlock x:Name="RentalCosts" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <TextBlock x:Name="RenterStatus" TextWrapping="Wrap" Opacity="0.7"/>
+
+                        </StackPanel><StackPanel x:Name="RentalHistoryPanel" Grid.Column="2" Margin="0,0,0,0"><TextBlock Text="{DynamicResource rentalHistory}" FontSize="18" FontWeight="SemiBold"/><TextBlock x:Name="RentalTotals" TextWrapping="Wrap" Margin="0,10"/><ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto" Focusable="False"><TextBlock x:Name="RentalHistoryText" TextWrapping="Wrap" Focusable="False" IsHitTestVisible="False" Cursor="Arrow"/></ScrollViewer><TextBlock Text="{DynamicResource rentalEstimateHelp}" TextWrapping="Wrap" Opacity="0.7" Margin="0,8"/></StackPanel></Grid>
+                        <DataGrid x:Name="Servers" Grid.Row="2" MinHeight="160" MaxHeight="420" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserAddRows="False" SelectionMode="Single" PreviewMouseDown="IgnoreServerSelection" Focusable="False" RowHeight="44">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="{DynamicResource name}" Binding="{Binding Name}" Width="*" MinWidth="170" />
+                                <DataGridTextColumn Header="{DynamicResource owner}" Binding="{Binding OwnerName}" Width="150" />
+                                <DataGridTextColumn Header="{DynamicResource state}" Binding="{Binding State}" Width="170" />
+                                <DataGridTextColumn Header="Game" Binding="{Binding Ports.Game}" Width="75" />
+                                <DataGridTextColumn Header="Query" Binding="{Binding Ports.Query}" Width="75" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid></ScrollViewer>
+                </TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="MyServersTab" Header="{DynamicResource server}" Tag="M3 4 H17 V13 H3 Z M7 17 H13 M10 13 V17">
+                    <Grid Margin="24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" /><RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.ColumnSpan="3" Margin="0,0,0,24"><Button x:Name="AddServerButton" Style="{StaticResource PrimaryButton}" Content="{DynamicResource addServer}" Click="AddServerClick" DockPanel.Dock="Right" Padding="18,8"/><TextBlock Text="{DynamicResource server}" FontSize="26" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                
+                                <Label Content="{DynamicResource name}" Target="{Binding ElementName=ServerName}" Padding="0" />
+                                <TextBox x:Name="ServerName" Text="My Squad Server" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+                                <Label Content="{DynamicResource gamePassword}" Target="{Binding ElementName=ServerPassword}" Padding="0" />
+                                <PasswordBox x:Name="ServerPassword" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+                                <TextBlock Text="{DynamicResource passwordHint}" FontSize="12" TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,8" />
+                                <Label Content="{DynamicResource playersLimit}" Target="{Binding ElementName=MaxPlayers}" Padding="0" />
+                                <TextBox x:Name="MaxPlayers" Text="100" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+
+
+
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Border Grid.Row="1" Grid.Column="2" VerticalAlignment="Top" Background="#141711" CornerRadius="16" Padding="28"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+                            <TextBlock x:Name="MineStatus" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="MineAddress" TextWrapping="Wrap" Margin="0,12,0,20" FontSize="17" />
+                            <TextBlock x:Name="MineMods" TextWrapping="Wrap" Margin="0,0,0,16" />
+                            <ProgressBar x:Name="InstallProgress" Height="6" Minimum="0" Maximum="100" Margin="0,0,0,12" Visibility="Collapsed" />
+                            <TextBlock x:Name="InstallTiming" TextWrapping="Wrap" Margin="0,0,0,12" />
+                            <StackPanel x:Name="ServerSetupHelp" Margin="0,0,0,20"><TextBlock Text="{DynamicResource firstHostHelp}" TextWrapping="Wrap" Margin="0,0,0,12"/><Button Content="{DynamicResource goHosting}" Click="GoHostingClick" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}"/></StackPanel><TextBlock x:Name="InstallationStepsHelp" Text="{DynamicResource installSteps}" TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,12" />
+                            <TextBlock x:Name="GameReadinessHint" Text="{DynamicResource gameReadiness}" Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,24" />
+                            <WrapPanel>
+                            <Button x:Name="RestartButton" Content="{DynamicResource restartServer}" Click="RestartClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                            </WrapPanel>
+                            <TextBlock x:Name="OwnError" TextWrapping="Wrap" Margin="0,12,0,0" />
+                        </StackPanel></ScrollViewer></Border>
+                        <WrapPanel Grid.Row="2" Grid.ColumnSpan="3" Margin="0,20,0,0">
+                            <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" Content="{DynamicResource start}" Click="StartClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                            <Button x:Name="SaveSettingsButton" Content="{DynamicResource saveSettings}" Click="SaveSettingsClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" />
+                            <Button x:Name="StopButton" Content="{DynamicResource stop}" Click="StopClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                            <Button x:Name="ReleaseButton" Content="{DynamicResource release}" Click="ReleaseClick" Visibility="Collapsed" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                        </WrapPanel>
+                    </Grid>
+                </TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="ConsoleTab" Header="{DynamicResource console}" Tag="M3 4 H17 V16 H3 Z M6 8 L8 10 6 12 M10 12 H14"><Grid><Grid Margin="24"><Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <WrapPanel>
+                            <CheckBox x:Name="FollowLogs" Content="{DynamicResource followLogs}" Margin="0,8,16,0" Checked="FollowLogsChanged" Unchecked="FollowLogsChanged" />
+                            <Button Content="{DynamicResource saveLog}" Click="SaveLogClick" Padding="14,7" Margin="0,0,8,8" />
+                            <Button x:Name="LogsButton" Content="{DynamicResource logs}" Click="LogsClick" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                        </WrapPanel>
+                        <TabControl HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="ConsoleViews" Grid.Row="1" Margin="0,8,0,12">
+                            <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource logs}"><TextBox x:Name="LogOutput" IsUndoEnabled="False" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Cascadia Mono, Consolas" FontSize="13" Text="{DynamicResource consoleEmpty}" Padding="9,6" /></TabItem>
+                            <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="RCON"><DockPanel><Expander DockPanel.Dock="Top" Header="{DynamicResource rconCatalog}" Margin="0,0,0,8"><StackPanel><TextBlock Text="{DynamicResource rconCatalogHelp}" TextWrapping="Wrap" Margin="8"/><Button Content="{DynamicResource listCommands}" Click="ListCommandsClick" HorizontalAlignment="Left" Padding="14,7"/><TextBox x:Name="CommandSearch" TextChanged="CommandSearchChanged" Padding="9,6" Margin="0,8" ToolTip="{DynamicResource search}"/><ListBox x:Name="CommandCatalog" Height="170" SelectionChanged="CatalogSelected"/></StackPanel></Expander><TextBox x:Name="Output" IsUndoEnabled="False" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Cascadia Mono, Consolas" FontSize="13" Text="{DynamicResource consoleEmpty}" Padding="9,6" Margin="0,5,0,14" MinHeight="34" /></DockPanel></TabItem>
+                        </TabControl>
+                        <DockPanel Grid.Row="2">
+                            <Button x:Name="CommandButton" DockPanel.Dock="Right" Content="{DynamicResource send}" Click="CommandClick" Margin="12,5,0,14" Padding="14,7" MinHeight="34" />
+                            <TextBox x:Name="Command" ToolTip="{DynamicResource commandHelp}" KeyDown="CommandKeyDown" AutomationProperties.Name="{DynamicResource commandHelp}" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+                        </DockPanel>
+                    </Grid><local:EmptyServerView/></Grid></TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource players}" Tag="M7 4 A3 3 0 1 1 7 10 A3 3 0 1 1 7 4 M2 17 V15 Q2 12 7 12 Q12 12 12 15 V17 M14 5 Q18 5 18 8 Q18 10 15 10 M15 12 Q19 12 19 16"><Grid><Grid Margin="24"><Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <WrapPanel><Button x:Name="RefreshPlayersButton" Content="{DynamicResource refreshPlayers}" Click="RefreshPlayersClick" Padding="14,7" Margin="0,0,12,12" /><TextBlock x:Name="PlayerCount" VerticalAlignment="Center" /></WrapPanel>
+                        <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <DockPanel><TextBlock x:Name="TeamOneLabel" DockPanel.Dock="Top" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/><DataGrid x:Name="PlayerList" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" SelectionMode="Single" SelectionChanged="PlayerSelectionChanged" SizeChanged="PlayerGridSized" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="{DynamicResource playerName}" Binding="{Binding DisplayName}" Width="300" MinWidth="180"/><DataGridTextColumn Header="Steam ID" Binding="{Binding SteamId}" Width="150" MinWidth="140"/></DataGrid.Columns><DataGrid.GroupStyle><GroupStyle><GroupStyle.HeaderTemplate><DataTemplate><TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="8,12,0,6"/></DataTemplate></GroupStyle.HeaderTemplate></GroupStyle></DataGrid.GroupStyle></DataGrid></DockPanel>
+                            <DockPanel Grid.Column="2"><TextBlock x:Name="TeamTwoLabel" DockPanel.Dock="Top" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/><DataGrid x:Name="PlayerListTwo" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" SelectionMode="Single" SelectionChanged="PlayerSelectionChanged" SizeChanged="PlayerGridSized" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="{DynamicResource playerName}" Binding="{Binding DisplayName}" Width="300" MinWidth="180"/><DataGridTextColumn Header="Steam ID" Binding="{Binding SteamId}" Width="150" MinWidth="140"/></DataGrid.Columns><DataGrid.GroupStyle><GroupStyle><GroupStyle.HeaderTemplate><DataTemplate><TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="8,12,0,6"/></DataTemplate></GroupStyle.HeaderTemplate></GroupStyle></DataGrid.GroupStyle></DataGrid></DockPanel>
+                        </Grid>
+                        <StackPanel x:Name="PlayersPanel" Grid.Row="2" Margin="0,16,0,0">
+                            <TextBlock Text="{DynamicResource playerActionsHelp}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <DockPanel><TextBox x:Name="BanDuration" Text="1d" Width="90" DockPanel.Dock="Right" Margin="12,0,0,0" Padding="9,6" ToolTip="{DynamicResource banDuration}" /><TextBox x:Name="PlayerReason" Padding="9,6" ToolTip="{DynamicResource reason}" /></DockPanel>
+                            <WrapPanel Margin="0,12,0,8"><Button Content="{DynamicResource warnPlayer}" Tag="AdminWarnById" Click="PlayerActionClick" Padding="14,7" Margin="0,0,12,8" /><Button Content="{DynamicResource kickPlayer}" Tag="AdminKickById" Click="PlayerActionClick" Padding="14,7" Margin="0,0,12,8" /><Button Content="{DynamicResource banPlayer}" Tag="AdminBanById" Click="PlayerActionClick" Padding="14,7" Margin="0,0,12,8" /><Button Content="{DynamicResource changeTeam}" Tag="AdminForceTeamChangeById" Click="PlayerActionClick" Padding="14,7" Margin="0,0,12,8" /></WrapPanel>
+                            <DockPanel><Button Content="{DynamicResource broadcast}" Click="BroadcastClick" DockPanel.Dock="Right" Padding="14,7" Margin="12,0,0,0" /><TextBox x:Name="BroadcastText" Padding="9,6" ToolTip="{DynamicResource broadcast}" /></DockPanel>
+                        </StackPanel>
+                    </Grid><local:EmptyServerView/></Grid></TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource modsTab}" Tag="M3 7 L7 4 11 7 7 10 Z M3 7 V13 L7 16 11 13 V7 M7 10 V16 M12 5 L15 3 18 5 15 7 Z M15 7 V11 M18 5 V9 L15 11">
+                    <Grid Margin="24"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+                        <TextBlock Text="{DynamicResource modsHelp}" TextWrapping="Wrap" Margin="0,0,0,16" /><DockPanel><Button Content="{DynamicResource searchWorkshop}" Click="SearchModsClick" DockPanel.Dock="Right" Padding="14,7" Margin="12,0,0,0"/><TextBox x:Name="ModSearch" Padding="9,6" ToolTip="{DynamicResource search}"/></DockPanel><ListBox x:Name="ModSearchResults" Height="280" Margin="0,12" DisplayMemberPath="Name"/><Button Content="{DynamicResource addSelectedMod}" Click="AddSearchModClick" HorizontalAlignment="Left" Padding="14,7" Margin="0,0,0,16"/></StackPanel></ScrollViewer><ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="{DynamicResource modInput}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                        <DockPanel><Button Content="{DynamicResource addMod}" Click="AddModClick" DockPanel.Dock="Right" Padding="14,7" Margin="12,0,0,0" /><TextBox x:Name="ModInput" Padding="9,6" ToolTip="{DynamicResource modInput}" /></DockPanel>
+                        <ListBox x:Name="ModList" Height="280" Margin="0,16" />
+                        <Expander Header="{DynamicResource advanced}" Margin="0,0,0,12"><TextBox x:Name="Mods" TextChanged="ModsChanged" Padding="9,6" Margin="0,8,0,0" ToolTip="{DynamicResource mods}" /></Expander>
+                        <WrapPanel><Button Content="{DynamicResource remove}" Click="RemoveModClick" Padding="14,7" Margin="0,0,12,12" /><Button Content="{DynamicResource workshop}" Click="WorkshopClick" Padding="14,7" Margin="0,0,12,12" /><Button x:Name="SaveModsButton" Content="{DynamicResource saveMods}" Click="SaveModsClick" Padding="14,7" Margin="0,0,12,12" /></WrapPanel>
+                        <TextBlock Text="{DynamicResource modsApplyHelp}" TextWrapping="Wrap" />
+                    </StackPanel></ScrollViewer></Grid>
+                </TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource gameAdmins}" Tag="M10 3 A4 4 0 1 1 10 11 A4 4 0 1 1 10 3 M3 18 Q3 13 10 13 Q17 13 17 18"><Grid><ScrollViewer VerticalScrollBarVisibility="Auto"><ScrollViewer.Style><Style TargetType="ScrollViewer"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></ScrollViewer.Style><StackPanel x:Name="AdminEditorPanel" IsEnabled="False" Margin="20">
+                        <TextBlock Text="{DynamicResource adminsHelp}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                        <WrapPanel><Button Content="{DynamicResource save}" Click="SaveAdminsClick" Padding="14,7" Margin="0,0,12,12" /></WrapPanel>
+                        <Grid Height="190"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <DataGrid x:Name="AdminGroups" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="AdminGroupSelected"><DataGrid.Columns><DataGridTextColumn Header="{DynamicResource adminGroup}" Binding="{Binding Name}" Width="120" /><DataGridTextColumn Header="{DynamicResource permissions}" Binding="{Binding Permissions}" Width="*" /></DataGrid.Columns></DataGrid>
+                            <DataGrid x:Name="AdminMembers" Grid.Column="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="AdminMemberSelected"><DataGrid.Columns><DataGridTextColumn Header="Steam ID" Binding="{Binding SteamId}" Width="*" /><DataGridTextColumn Header="{DynamicResource adminGroup}" Binding="{Binding Group}" Width="120" /></DataGrid.Columns></DataGrid>
+                        </Grid>
+                        <TextBlock Text="{DynamicResource groupEditHelp}" TextWrapping="Wrap" Margin="0,14,0,8" />
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="GroupNameInput" Padding="9,6" ToolTip="{DynamicResource adminGroup}" /><TextBox x:Name="GroupPermissionsInput" Visibility="Collapsed"/><WrapPanel Grid.Column="2"><Button Content="{DynamicResource setGroup}" Click="SetGroupClick" Padding="14,7" Margin="0,0,8,0" /><Button Content="{DynamicResource remove}" Click="RemoveGroupClick" Padding="14,7" /></WrapPanel></Grid>
+                        <WrapPanel x:Name="PermissionFlags" Margin="0,12"/><TextBlock Text="{DynamicResource adminAddHelp}" TextWrapping="Wrap" Margin="0,14,0,8" />
+                        <WrapPanel><TextBox x:Name="AdminSteamId" Width="190" Padding="9,6" ToolTip="Steam ID" /><ComboBox x:Name="AdminGroup" Width="170" Margin="12,0" Padding="9,6" ToolTip="{DynamicResource adminGroup}" /><Button Content="{DynamicResource addAdmin}" Click="AddAdminClick" Padding="14,7" Margin="0,0,12,0" /><Button Content="{DynamicResource removeAdmin}" Click="RemoveAdminClick" Padding="14,7" /></WrapPanel>
+                        <Expander Header="{DynamicResource advanced}" Margin="0,16,0,0"><TextBox x:Name="AdminsEditor" Height="220" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="12" TextChanged="AdminsTextChanged" /></Expander>
+                    </StackPanel></ScrollViewer><local:EmptyServerView/></Grid></TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource files}" Tag="M5 3 H12 L16 7 V17 H5 Z M12 3 V7 H16"><Grid><Grid Margin="24"><Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <TextBlock Text="{DynamicResource filesHelp}" TextWrapping="Wrap" Margin="0,0,0,14" />
+                        <WrapPanel Grid.Row="1"><ComboBox x:Name="FileCategory" SelectedIndex="0" SelectionChanged="FileCategoryChanged" Width="190" Margin="0,0,12,12"><ComboBoxItem Content="{DynamicResource allFiles}"/><ComboBoxItem Content="{DynamicResource logs}"/><ComboBoxItem Content="{DynamicResource scoreboards}"/></ComboBox><Button x:Name="ConfigButton" Content="{DynamicResource config}" Click="ConfigClick" Padding="14,7" Margin="0,0,12,12"/><Button x:Name="FilesRefreshButton" Content="{DynamicResource refresh}" Click="FilesRefreshClick" Padding="14,7" Margin="0,0,12,12" /><Button x:Name="DownloadFileButton" Content="{DynamicResource downloadFile}" Click="DownloadFileClick" Padding="14,7" Margin="0,0,12,12" /><Button x:Name="ArchiveButton" Content="{DynamicResource archive}" Click="ArchiveClick" Padding="14,7" Margin="0,0,12,12" /></WrapPanel>
+                        <DataGrid x:Name="FileList" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" SelectionMode="Single" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="{DynamicResource filePath}" Binding="{Binding DisplayPath}" Width="*" /><DataGridTextColumn Header="{DynamicResource fileSize}" Binding="{Binding Size}" Width="160" /></DataGrid.Columns></DataGrid>
+                    </Grid><local:EmptyServerView/></Grid></TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="AdminPanel" Header="{DynamicResource users}" Tag="M7 4 A3 3 0 1 1 7 10 A3 3 0 1 1 7 4 M2 17 V15 Q2 12 7 12 Q12 12 12 15 V17 M14 5 Q18 5 18 8 Q18 10 15 10 M15 12 Q19 12 19 16" Visibility="Collapsed">
+                    <Grid Margin="24">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="{DynamicResource usersHelp}" TextWrapping="Wrap" MaxWidth="850" HorizontalAlignment="Left" Margin="0,0,0,18" />
+                        <Grid Grid.Row="1" Margin="0,0,0,18" MaxWidth="700" HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="160"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="8"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Label Content="{DynamicResource participantName}" Target="{Binding ElementName=ParticipantName}" Padding="0"/>
+                            <TextBox x:Name="ParticipantName" Grid.Row="2" ToolTip="{DynamicResource participantName}" AutomationProperties.Name="{DynamicResource participantName}" Padding="12,8" MinHeight="38"/>
+                            <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource PrimaryButton}" Content="{DynamicResource createUser}" Click="CreateUserClick" Padding="14,8" MinHeight="38" VerticalAlignment="Stretch"/>
+                            <Button Grid.Row="2" Grid.Column="4" Content="{DynamicResource refresh}" Click="UsersRefreshClick" Padding="14,8" MinHeight="38" VerticalAlignment="Stretch"/>
+                        </Grid>
+                        <DataGrid x:Name="Users" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" RowHeight="44" SelectionMode="Single" SelectionChanged="UserSelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="{DynamicResource username}" Binding="{Binding Name}" Width="*" />
+                                <DataGridTextColumn Header="{DynamicResource state}" Binding="{Binding State}" Width="250" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Grid.Row="3" Margin="0,18,0,0">
+                            <WrapPanel>
+                                <Button Content="{DynamicResource accessLimits}" Click="AccessLimitsClick" Margin="0,0,8,8"/><Button x:Name="RotateButton" Content="{DynamicResource newKey}" Click="RotateKeyClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                                <Button x:Name="RevokeButton" Content="{DynamicResource revoke}" Click="RevokeUserClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                            </WrapPanel>
+                            <TextBlock x:Name="KeyHint" Text="{DynamicResource keyOnce}" Visibility="Collapsed" TextWrapping="Wrap" />
+                            <DockPanel x:Name="KeyPanel" Visibility="Collapsed">
+                                <Button Content="{DynamicResource copyKey}" Click="CopyKeyClick" DockPanel.Dock="Right" Margin="12,5,0,14" Padding="14,7" MinHeight="34" />
+                                <TextBox x:Name="IssuedKey" IsReadOnly="True" FontFamily="Consolas" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource settings}" Tag="M10 6 A4 4 0 1 1 10 14 A4 4 0 1 1 10 6 M10 2 V4 M10 16 V18 M2 10 H4 M16 10 H18 M4 4 L6 6 M14 14 L16 16 M4 16 L6 14 M14 6 L16 4">
+                    <ScrollViewer x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center">
+                        <Grid MinHeight="{Binding ViewportHeight,ElementName=SettingsScroll}"><StackPanel x:Name="SettingsContent" Margin="32,28" MaxWidth="760" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+
+                            <Button Content="{DynamicResource disconnect}" Click="LogoutClick" HorizontalAlignment="Left" Padding="14,7" Margin="0,0,0,20" MinHeight="38" />
+                            <Button x:Name="RemoveSharedHostingButton" Content="{DynamicResource sharedRemoveButton}" Click="RemoveSharedHostingClick" HorizontalAlignment="Left" Margin="0,12,0,0" Visibility="Collapsed"/><Button x:Name="PersonalAccountButton" Tag="edit" Content="{DynamicResource changeCherryKey}" Click="OwnCherryClick" HorizontalAlignment="Left" Margin="0,12,0,0" Visibility="Collapsed"/><TextBlock x:Name="HostingModeHelp" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,28"/><Expander Header="{DynamicResource connectionSettings}" Margin="0,0,0,16"><StackPanel><TextBlock Text="{DynamicResource connectionHelp}" TextWrapping="Wrap" Margin="0,12"/><TextBox Text="{Binding Text,ElementName=Endpoint,Mode=OneWay}" IsReadOnly="True" Padding="9,6"/></StackPanel></Expander>
+                            <StackPanel x:Name="OwnerSettings" Visibility="Collapsed"><Expander Header="{DynamicResource maintenance}" Margin="0,0,0,16"><StackPanel><TextBlock Text="{DynamicResource hostMaintenanceHelp}" TextWrapping="Wrap" Margin="0,12"/>
+                                <Separator Margin="0,12,0,20" />
+                                <TextBlock Text="{DynamicResource hostId}" />
+                                <TextBox x:Name="ExistingHostId" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+                                <WrapPanel>
+                                    <Button Content="{DynamicResource adopt}" Click="AdoptClick" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                                    <Button Content="{DynamicResource recover}" Click="RecoveryClick" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                                </WrapPanel>
+                                </StackPanel></Expander>
+                            </StackPanel>
+                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,28" />
+                            <TextBlock Text="{DynamicResource aboutApplication}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                            <TextBlock x:Name="AboutVersion" Margin="0,0,0,12"/>
+                            <WrapPanel><Button Content="GitHub" Click="GithubClick" Padding="14,7" Margin="0,0,12,12"/><Button Content="Buy Me a Coffee" Click="SupportClick" Padding="14,7" Margin="0,0,12,12"/></WrapPanel>
+                            <TextBlock x:Name="UpdateStatus" TextWrapping="Wrap" Margin="0,8,0,12"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                            <Button Content="{DynamicResource checkUpdates}" Click="UpdateClick" HorizontalAlignment="Left" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
+                        </StackPanel>
+                    </Grid></ScrollViewer>
+                </TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource match}" Tag="M4 18 V3 M4 4 H10 L11 6 H17 V12 H11 L10 10 H4"><Grid><Grid x:Name="MatchPanel" Margin="24"><Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+                    <TextBlock Text="{DynamicResource mapAndMatch}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="CurrentLayer" FontSize="15" TextWrapping="Wrap" Margin="0,0,0,8"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock><TextBlock x:Name="UpcomingLayer" TextWrapping="Wrap" Margin="0,0,0,16"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                    <TextBlock Text="{DynamicResource chooseLayer}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                    <DockPanel><Button Content="{DynamicResource refresh}" Click="RefreshLayersClick" DockPanel.Dock="Right" Padding="14,7" Margin="12,0,0,0"/><ComboBox x:Name="LayerInput" IsEditable="True" IsTextSearchEnabled="True" MinWidth="0" Padding="9,6"/></DockPanel>
+                    <TextBlock Text="{DynamicResource layerActionsHelp}" TextWrapping="Wrap" Margin="0,14"/>
+                    <WrapPanel><Button Style="{StaticResource PrimaryButton}" Content="{DynamicResource setLayer}" Click="SetLayerClick" Padding="14,7" Margin="0,0,12,12"/><Button Content="{DynamicResource changeLayerNow}" Click="ChangeLayerNowClick" Padding="14,7" Margin="0,0,12,12"/></WrapPanel>
+                    <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,24"/><TextBlock Text="{DynamicResource matchActions}" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,12"/><WrapPanel><Button x:Name="RestartMatchButton" IsEnabled="False" Content="{DynamicResource restartMatch}" Click="RestartMatchClick" Padding="14,7" Margin="0,0,12,12"/><Button x:Name="EndMatchButton" IsEnabled="False" Content="{DynamicResource endMatch}" Click="EndMatchClick" Padding="14,7" Margin="0,0,12,12"/></WrapPanel>
+                    <WrapPanel><Button x:Name="ResumeMatchButton" Visibility="Collapsed" IsEnabled="False" Content="{DynamicResource resumeMatch}" Click="ResumeMatchClick" Padding="14,7" Margin="0,0,12,12"/></WrapPanel>
+                    </StackPanel></ScrollViewer><ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="{DynamicResource rconCatalog}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                    <TextBlock Text="{DynamicResource search}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,0,0,6"/><TextBox x:Name="MatchCommandSearch" TextChanged="MatchCommandSearchChanged" Padding="9,6" Margin="0,0,0,12" ToolTip="{DynamicResource search}"/>
+                    <TextBlock Text="{DynamicResource rconCommandLabel}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,6"/><ComboBox x:Name="MatchCommandPicker" SelectionChanged="MatchCommandSelected" DisplayMemberPath="Label" MaxDropDownHeight="320" Padding="9,6" MinWidth="0"/>
+                    <TextBlock x:Name="MatchCommandHelp" TextWrapping="Wrap" Margin="0,12"/>
+                    <WrapPanel x:Name="MatchParameters"/>
+                    <Button x:Name="MatchRunButton" IsEnabled="False" Style="{StaticResource PrimaryButton}" Content="{DynamicResource send}" Click="RunMatchCommandClick" HorizontalAlignment="Left" Padding="14,7" Margin="0,12"/>
+                    <TextBlock Text="{DynamicResource commandReply}" FontSize="17" FontWeight="SemiBold" Margin="0,14,0,10"/><TextBox x:Name="MatchCommandResult" Text="{DynamicResource commandReplyEmpty}" IsReadOnly="True" AcceptsReturn="True" Height="150" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                </StackPanel></ScrollViewer></Grid><local:EmptyServerView/></Grid></TabItem>
+                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="StatisticsTab" Header="{DynamicResource statistics}" Tag="M3 17 H17 M5 14 V10 M10 14 V5 M15 14 V8" Visibility="Collapsed">
+                    <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="230"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock Text="{DynamicResource statistics}" Visibility="Collapsed"/>
+                    <StackPanel Grid.Row="1"><TextBlock x:Name="StatisticsTotals" FontSize="34" FontWeight="Medium" TextWrapping="Wrap"/><TextBlock x:Name="StatisticsSavings" Foreground="{StaticResource AccentBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/></StackPanel>
+                    <Canvas x:Name="StatisticsChart" Grid.Row="2" Margin="0,20,0,20" ClipToBounds="True" SizeChanged="StatisticsChartResized"/>
+                    <WrapPanel Grid.Row="3"><CheckBox x:Name="StatisticsAllTime" Loaded="StatisticsPeriodChanged" Checked="StatisticsPeriodChanged" Unchecked="StatisticsPeriodChanged" Content="{DynamicResource allTime}" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,12"/><DatePicker x:Name="StatisticsFrom" Margin="0,0,12,12"/><Button Content="{DynamicResource refresh}" Click="StatisticsClick" Padding="14,7" Margin="0,0,0,12"/></WrapPanel>
+                    <DataGrid x:Name="StatisticsUsers" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"><DataGrid.Columns>
+                    <DataGridTemplateColumn Header="{DynamicResource username}" Width="2*" MinWidth="160"><DataGridTemplateColumn.CellTemplate><DataTemplate><Grid VerticalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="#B2FF59" Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left"><TextBlock Text="{Binding Initial}" Foreground="#14200D" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"/></Border><TextBlock Grid.Column="1" Text="{Binding Name}" ToolTip="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn><DataGridTextColumn Header="{DynamicResource currency}" Binding="{Binding Currency}" Width="*" MinWidth="75"/><DataGridTextColumn Header="{DynamicResource spent}" Binding="{Binding Spent,StringFormat=F3}" Width="*" MinWidth="100"/><DataGridTextColumn Header="{DynamicResource separateHostsCost}" Binding="{Binding SeparateHosts,StringFormat=F3}" Width="1.5*" MinWidth="150"/><DataGridTemplateColumn Header="{DynamicResource savedMoney}" Width="1.2*" MinWidth="130"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding Saved,StringFormat=F3}" FontSize="12"/><ProgressBar Value="{Binding SavingsPercent,Mode=OneWay}" Height="4" Maximum="100" Width="80" HorizontalAlignment="Left" Margin="0,6,0,0"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    </DataGrid.Columns></DataGrid><StackPanel Grid.Row="5" Margin="0,14,0,0"><TextBlock x:Name="StatisticsNotes" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap"/><TextBlock Text="{DynamicResource statisticsHelp}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel>
+                    </Grid>
+                </TabItem>
+                <TabItem x:Name="FeaturesTab" Header="{DynamicResource automation}" Tag="M10 6 A4 4 0 1 1 10 14 A4 4 0 1 1 10 6 M10 2 V4 M10 16 V18 M2 10 H4 M16 10 H18 M4 4 L6 6 M14 14 L16 16 M4 16 L6 14 M14 6 L16 4"><ContentControl x:Name="FeatureHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
+            </TabControl>
+            </DockPanel>
+            <Border Grid.Column="1" CornerRadius="0" Padding="24,28"><Border.Background><SolidColorBrush Color="Transparent"/></Border.Background>
+            <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+            <TextBlock Text="{DynamicResource hostOverview}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,16"/>
+            <Border Background="#242A1D" CornerRadius="6" Padding="12,10" Margin="0,0,0,24"><TextBlock Text="{Binding Text,ElementName=HostStatus}" TextWrapping="Wrap" FontSize="14" FontWeight="Medium"/></Border>
+            <TextBlock Text="{DynamicResource hostAddress}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,0,0,6"/>
+            <TextBlock x:Name="OverviewAddress" TextWrapping="Wrap" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock x:Name="OverviewLocation" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
+            <TextBlock x:Name="OverviewRenter" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0"/>
+            <Grid x:Name="OverviewRental" Margin="0,24,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <StackPanel><TextBlock Text="{DynamicResource hostHourlyCost}" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="OverviewHourly" FontSize="17" FontWeight="Medium" Margin="0,6,0,0" TextWrapping="Wrap"/></StackPanel>
+            <StackPanel Grid.Column="2"><TextBlock Text="{DynamicResource hostPersonalSpent}" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="OverviewSpent" FontSize="17" FontWeight="Medium" Margin="0,6,0,0" TextWrapping="Wrap"/></StackPanel></Grid>
+            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,24"/>
+            <DockPanel Margin="0,0,0,8"><TextBlock x:Name="OverviewCount" DockPanel.Dock="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/><TextBlock Text="{DynamicResource server}" FontSize="18" FontWeight="SemiBold"/></DockPanel>
+            <ItemsControl x:Name="OverviewServers"><ItemsControl.ItemTemplate><DataTemplate><Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,16"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Ellipse Width="7" Height="7" Fill="{Binding DotColor}" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,7,0,0"/><StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/><TextBlock Text="{Binding State}" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"/><TextBlock Text="{Binding PasswordLabel}" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/></StackPanel></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+            <TextBlock x:Name="OverviewEmpty" Text="{DynamicResource noServers}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0"/>
+            <TextBlock Text="{DynamicResource balanceLabel}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,24,0,8"/>
+            <TextBlock x:Name="AccountBalance" Text="—" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,16"/>
+            </StackPanel></ScrollViewer></Border>
+            </Grid>
+        </Grid>
+        <StackPanel Grid.Row="2" Margin="0,16,0,0">
+            <ProgressBar x:Name="Activity" Height="3" IsIndeterminate="True" Visibility="Hidden" Margin="0,0,0,10" />
+            <TextBlock x:Name="Status" Text="{DynamicResource noConnection}" TextWrapping="Wrap" Width="192" HorizontalAlignment="Left" FontSize="12" LineHeight="18" />
+            <Expander x:Name="ErrorPanel" Header="{DynamicResource details}" Visibility="Collapsed" Margin="0,6,0,0">
+                <TextBox x:Name="ErrorDetails" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="100" VerticalScrollBarVisibility="Auto" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+            </Expander>
+        </StackPanel>
+    </Grid>
+    </Grid>
+    </DockPanel>
+</Window>
+

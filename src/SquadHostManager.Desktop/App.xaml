@@ -1,0 +1,9 @@
+﻿<Application x:Class="SquadHostManager.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SquadHostManager.Desktop"
+             StartupUri="MainWindow.xaml" ThemeMode="Dark">
+    <Application.Resources>
+        <ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="DashboardTheme.xaml"/></ResourceDictionary.MergedDictionaries></ResourceDictionary>
+    </Application.Resources>
+</Application>

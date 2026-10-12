@@ -1,0 +1,11 @@
+# Optional attachment to an existing reverse-proxy Docker network.
+services:
+  coordinator:
+    networks:
+      default:
+      proxy:
+        aliases: [shm-coordinator]
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-deploy_internal}

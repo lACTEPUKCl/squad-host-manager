@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SquadHostManager.Core\SquadHostManager.Core.csproj" />
+    <EmbeddedResource Include="../../artifacts/coordinator-win/SquadHostManager.Service.exe" LogicalName="SquadHostManager.Coordinator" Condition="Exists('../../artifacts/coordinator-win/SquadHostManager.Service.exe')" />
+    <EmbeddedResource Include="../../artifacts/coordinator-linux-x64/SquadHostManager.Service" LogicalName="SquadHostManager.Coordinator.linux-x64" Condition="Exists('../../artifacts/coordinator-linux-x64/SquadHostManager.Service')" />
+    <EmbeddedResource Include="../../artifacts/coordinator-linux-arm64/SquadHostManager.Service" LogicalName="SquadHostManager.Coordinator.linux-arm64" Condition="Exists('../../artifacts/coordinator-linux-arm64/SquadHostManager.Service')" />
+    <Resource Include="Assets/logo.png"/><Resource Include="Assets/logo.ico"/><Resource Include="Fonts/Manrope-Regular.ttf"/><Resource Include="Fonts/Manrope-Medium.ttf"/><Resource Include="Fonts/Manrope-SemiBold.ttf"/><Resource Include="Fonts/Manrope-Bold.ttf"/>
+    <EmbeddedResource Include="Strings.tsv" LogicalName="SquadHostManager.Desktop.Strings.tsv" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationIcon>Assets/logo.ico</ApplicationIcon>
+    <AssemblyName>SquadHostManager</AssemblyName>
+    <AssemblyTitle>Squad Server Manager</AssemblyTitle>
+    <Product>Squad Server Manager</Product>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+  <ItemGroup><Using Remove="System.Windows.Forms"/><Using Remove="System.Drawing"/></ItemGroup>
+  <Target Name="VerifyHostingInstallers" BeforeTargets="PrepareForBuild" Condition="'$(Configuration)' == 'Release'">
+    <Error Condition="!Exists('../../artifacts/coordinator-linux-x64/SquadHostManager.Service') Or !Exists('../../artifacts/coordinator-linux-arm64/SquadHostManager.Service') Or !Exists('../../artifacts/coordinator-win/SquadHostManager.Service.exe')" Text="Build the win-x64, linux-x64 and linux-arm64 coordinator installers before publishing the desktop app." />
+  </Target>
+
+</Project>

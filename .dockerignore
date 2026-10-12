@@ -1,0 +1,9 @@
+**
+!Directory.Build.props
+!src/
+!src/SquadHostManager.Core/
+!src/SquadHostManager.Core/**
+!src/SquadHostManager.Service/
+!src/SquadHostManager.Service/**
+**/bin
+**/obj

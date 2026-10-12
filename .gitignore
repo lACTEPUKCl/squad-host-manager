@@ -1,0 +1,26 @@
+# Legacy files are kept locally and deliberately excluded: configs may contain credentials.
+/main.py
+/test_ssh_key_flow.py
+/SquadDeployer.spec
+/plans.json
+/config/
+/dist/
+/build/
+/logo.*
+**/__pycache__/
+**/bin/
+**/obj/
+**/TestResults/
+/.local/
+/artifacts/
+*.user
+*.db*
+*.key
+*.pem
+.env
+*.secrets.json
+*.pfx
+*.log
+
+/squad-logs-*.tar.gz
+/PLAN.md
