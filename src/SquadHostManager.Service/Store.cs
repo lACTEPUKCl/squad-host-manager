@@ -29,6 +29,9 @@ public sealed class Store : IDisposable
             CREATE TABLE IF NOT EXISTS disabled_users (id TEXT PRIMARY KEY);
             """;
         cmd.ExecuteNonQuery();
+        using var migrationTransaction=db.BeginTransaction();using var migration=db.CreateCommand();migration.Transaction=migrationTransaction;
+        migration.CommandText="DELETE FROM sessions WHERE expires<=$now AND NOT EXISTS(SELECT 1 FROM documents WHERE id='permanent-sessions-v1'); UPDATE sessions SET expires=$forever WHERE NOT EXISTS(SELECT 1 FROM documents WHERE id='permanent-sessions-v1'); INSERT OR IGNORE INTO documents VALUES ('permanent-sessions-v1','true')";
+        migration.Parameters.AddWithValue("$now",DateTimeOffset.UtcNow.ToString("O"));migration.Parameters.AddWithValue("$forever",DateTimeOffset.MaxValue.ToString("O"));migration.ExecuteNonQuery();migrationTransaction.Commit();
     }
     public SqliteConnection Open() { var db = new SqliteConnection(connectionString); db.Open(); return db; }
     public T? Load<T>(string id)

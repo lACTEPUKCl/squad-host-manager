@@ -9,17 +9,37 @@ using SquadHostManager.Core;
 
 namespace SquadHostManager.Desktop;
 
+public sealed class HostingSelectionRequired(int[] ports,bool docker):Exception("recoverChooseHosting")
+{public int[] Ports{get;}=ports;public bool Docker{get;}=docker;}
+
 public sealed partial class SharedHostingDeployment
 {
-    public async Task<SharedHostingProfile> Recover(SharedHostingTarget target,HostingSshAccess access,CancellationToken ct=default)
+    private static SharedHostingProfile ReadLegacyRecovery(Renci.SshNet.SshClient ssh,string elevate,HostingSshAccess access)
+    {
+        using var inspection=JsonDocument.Parse(Run(ssh,elevate+"docker inspect squad-host-manager-coordinator-1 deploy-caddy-1"));
+        var container=inspection.RootElement.EnumerateArray().First(e=>e.GetProperty("Name").GetString()=="/squad-host-manager-coordinator-1");
+        var folder=container.GetProperty("Config").GetProperty("Labels").GetProperty("com.docker.compose.project.working_dir").GetString();
+        if(folder!="/opt/squad-host-manager/deploy")throw new HostingSetupException("recoverHostingMissing");
+        string? Env(JsonElement node,string name)=>node.GetProperty("Config").GetProperty("Env").EnumerateArray().Select(e=>e.GetString()!).FirstOrDefault(v=>v.StartsWith(name+"=",StringComparison.Ordinal))?[(name.Length+1)..];
+        var proxy=inspection.RootElement.EnumerateArray().First(e=>e.GetProperty("Name").GetString()=="/deploy-caddy-1");var domain=Env(proxy,"DOMAIN");
+        if(domain==null || Uri.CheckHostName(domain)==UriHostNameType.Unknown)throw new HostingSetupException("recoverHostingMissing");
+        var password=Env(container,"Admin__Password")??Run(ssh,elevate+"docker exec squad-host-manager-coordinator-1 cat /data/initial-admin-password.txt");
+        return new(new UriBuilder("https",domain,8443){Path="/shm/"}.Uri.ToString(),null,password,access.Fingerprint!,domain);
+    }
+    public async Task<SharedHostingProfile> Recover(SharedHostingTarget target,HostingSshAccess access,CancellationToken ct=default,bool legacy=false)
     {
         target.Validate();
         var profile=await Task.Run(()=>
         {
             ct.ThrowIfCancellationRequested();using var ssh=Open(target,access);var elevate=Elevation(ssh);
+            var docker=Run(ssh,elevate+"sh -c "+Quote("if test -f /opt/squad-host-manager/deploy/compose.yml && command -v docker >/dev/null 2>&1 && docker inspect squad-host-manager-coordinator-1 >/dev/null 2>&1; then printf yes; fi"))=="yes";
+            if(legacy && docker)return ReadLegacyRecovery(ssh,elevate,access);
             var installations=Run(ssh,elevate+"sh -c "+Quote("if test -f "+target.Root+"/install.json; then printf '%s\\n' "+target.Root+"/install.json; else find /opt -maxdepth 2 -name install.json -path '/opt/squad-host-manager-app-*/install.json'; fi"));
             var paths=installations.Split('\n',StringSplitOptions.RemoveEmptyEntries);
-            if(paths.Length!=1)throw new HostingSetupException("sharedConfigurationMissing");
+            var requested=paths.Any(p=>p==target.Root+"/install.json");
+            if(!requested && (paths.Length>1 || docker && paths.Length>0))throw new HostingSelectionRequired(paths.Select(p=>System.Text.RegularExpressions.Regex.Match(p,@"app-(\d+)/install.json$")).Where(m=>m.Success).Select(m=>int.Parse(m.Groups[1].Value)).ToArray(),docker);
+            if(paths.Length==0 && docker)return ReadLegacyRecovery(ssh,elevate,access);
+            if(paths.Length!=1)throw new HostingSetupException("recoverHostingMissing");
             var match=System.Text.RegularExpressions.Regex.Match(paths[0],@"^/opt/squad-host-manager-app-(\d+)/install.json$");
             if(!match.Success || !int.TryParse(match.Groups[1].Value,out var detectedPort))throw new HostingSetupException("sharedConfigurationMissing");
             target=target with{ServicePort=detectedPort};target.Validate();
@@ -90,9 +110,20 @@ public partial class MainWindow
             {
                 var target=new SharedHostingTarget(address.Text.Trim(),sshPortValue,user.Text.Trim(),publicPort);
                 var access=new HostingSshAccess(password.Password,string.IsNullOrWhiteSpace(key.Text)?null:key.Text.Trim(),keyPassword.Password,fingerprint);
-                SharedHostingProfile profile;
-                try{profile=await new SharedHostingDeployment().Recover(target,access);}
-                catch(SshTrustRequired trust){if(!Confirm(L("sharedTrustRequired")+"\n"+trust.Fingerprint,L("recoverConnection")))return;fingerprint=trust.Fingerprint;profile=await new SharedHostingDeployment().Recover(target,access with{Fingerprint=fingerprint});}
+                SharedHostingProfile profile;var legacy=false;
+                while(true)
+                {
+                    try{profile=await new SharedHostingDeployment().Recover(target,access,legacy:legacy);break;}
+                    catch(SshTrustRequired trust){if(!Confirm(L("sharedTrustRequired")+"\n"+trust.Fingerprint,L("recoverConnection")))return;fingerprint=trust.Fingerprint;access=access with{Fingerprint=fingerprint};}
+                    catch(HostingSelectionRequired choice)
+                    {
+                        var selection=new Window{Owner=dialog,Title=L("recoverChooseHosting"),Width=460,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var body=new StackPanel{Margin=new Thickness(24)};selection.Content=body;
+                        body.Children.Add(new TextBlock{Text=L("recoverChooseHosting"),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,16)});
+                        var choices=new List<(int Port,bool Docker,string Label)>();if(choice.Docker)choices.Add((0,true,L("recoverDockerHosting")));choices.AddRange(choice.Ports.Select(p=>(p,false,L("hostOverview")+" · "+p)));
+                        var picker=new ComboBox{ItemsSource=choices.Select(c=>c.Label).ToList(),SelectedIndex=0,Margin=new Thickness(0,0,0,16)};body.Children.Add(picker);var open=new Button{Content=L("recoverConnection")};body.Children.Add(open);open.Click+=(_,_)=>selection.DialogResult=true;
+                        if(selection.ShowDialog()!=true)return;var selected=choices[picker.SelectedIndex];legacy=selected.Docker;if(!legacy)target=target with{ServicePort=selected.Port};
+                    }
+                }
                 SharedHostingProfiles.Save(profile);RefreshSharedProfiles();await Safe(()=>ConnectSharedOwner(profile));working=false;dialog.Close();ShowConnectionDetails(profile);
             }
             catch(Exception error){status.Text=error is HostingSetupException setup?L(setup.MessageKey):error.Message;}

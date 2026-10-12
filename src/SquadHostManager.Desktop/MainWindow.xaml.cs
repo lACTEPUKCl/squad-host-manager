@@ -75,11 +75,10 @@ public partial class MainWindow : Window
                 if (!System.IO.File.Exists(Settings)) return;
                 var saved = JsonSerializer.Deserialize<Saved>(ProtectedData.Unprotect(System.IO.File.ReadAllBytes(Settings), null, DataProtectionScope.CurrentUser));
                 if (saved == null) return;
-                if(saved.Endpoint==LocalCoordinator.Endpoint && LocalCoordinator.Configured){await Safe(ConnectPersonalAccount);return;}
+                if(saved.Endpoint==LocalCoordinator.Endpoint && LocalCoordinator.Configured)await LocalCoordinator.EnsureStarted();
                 Endpoint.Text = saved.Endpoint;certificateSha256=saved.CertificateSha256; Username.Text = saved.Session.Name;
                 var owner=SharedHostingProfiles.Read().FirstOrDefault(p=>p.Endpoint==saved.Endpoint);
-                if(owner!=null){await Safe(()=>ConnectSharedOwner(owner));return;}
-                if(saved.Invitation!=null){await Safe(()=>SignInWithInvitation(saved.Invitation));return;}
+                certificateSha256=saved.CertificateSha256??owner?.CertificateSha256;rememberedInvitation=saved.Invitation;
                 await Safe(() => Connect(saved.Session));
             }
             catch { Status.Text = L("savedInvalid"); }

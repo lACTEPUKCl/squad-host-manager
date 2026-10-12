@@ -50,7 +50,7 @@ public sealed partial class Accounts
         using var reader = find.ExecuteReader(); if (!reader.Read()) throw new UnauthorizedAccessException("Ключ недействителен.");
         var id = reader.GetString(0); var name = reader.GetString(1); reader.Close();
         EnsureAccess(id);
-        var token = Store.Secret(); using var cmd = db.CreateCommand(); cmd.Transaction = tx; cmd.CommandText = "INSERT INTO sessions VALUES ($hash,$id,$expires)"; cmd.Parameters.AddWithValue("$hash", Store.Hash(token)); cmd.Parameters.AddWithValue("$id", id); cmd.Parameters.AddWithValue("$expires", DateTimeOffset.UtcNow.AddDays(7).ToString("O")); cmd.ExecuteNonQuery(); tx.Commit();
+        var token = Store.Secret(); using var cmd = db.CreateCommand(); cmd.Transaction = tx; cmd.CommandText = "INSERT INTO sessions VALUES ($hash,$id,$expires)"; cmd.Parameters.AddWithValue("$hash", Store.Hash(token)); cmd.Parameters.AddWithValue("$id", id); cmd.Parameters.AddWithValue("$expires", DateTimeOffset.MaxValue.ToString("O")); cmd.ExecuteNonQuery(); tx.Commit();
         return new(token, id, name, false);
     }
 }

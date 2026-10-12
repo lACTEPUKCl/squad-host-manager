@@ -30,7 +30,7 @@ Both have the same features and include .NET. Full is useful if you want all set
 2. Choose **I have an invitation** and paste the key.
 3. Open **My servers** and add a server.
 
-The key includes the connection address. You do not need a Cherry account.
+The key includes the connection address. You do not need a Cherry account. Your saved session stays valid until you sign out or the owner revokes access.
 
 ## Use your own Cherry account
 

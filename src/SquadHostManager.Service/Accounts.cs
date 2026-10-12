@@ -55,7 +55,7 @@ public sealed partial class Accounts(Store store)
         var token = Store.Secret(); using var db = store.Open(); using var cmd = db.CreateCommand();
         cmd.CommandText = "DELETE FROM sessions WHERE expires < $now; INSERT INTO sessions VALUES ($hash,$id,$expires)";
         cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O")); cmd.Parameters.AddWithValue("$hash", Store.Hash(token));
-        cmd.Parameters.AddWithValue("$id", user.Id); cmd.Parameters.AddWithValue("$expires", DateTimeOffset.UtcNow.AddDays(7).ToString("O")); cmd.ExecuteNonQuery();
+        cmd.Parameters.AddWithValue("$id", user.Id); cmd.Parameters.AddWithValue("$expires", DateTimeOffset.MaxValue.ToString("O")); cmd.ExecuteNonQuery();
         return new(token, user.Id, user.Name, user.IsAdmin);
     }
     public User? Authenticate(string token)
