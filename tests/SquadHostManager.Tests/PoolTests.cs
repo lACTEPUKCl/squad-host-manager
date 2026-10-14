@@ -18,6 +18,8 @@ public sealed class Fixture : IDisposable
 }
 public sealed class FakeInfrastructure : IInfrastructure
 {
+    public Dictionary<string,string> StockConfigs=[];
+    public Task<Dictionary<string,string>> DownloadedConfigs(string hostId,string ip,CancellationToken ct)=>Task.FromResult(new Dictionary<string,string>(StockConfigs));
     public BalanceView BalanceValue=new(28.31m,"EUR",0,DateTimeOffset.UtcNow);
     public bool BalanceFails;
     public int BalanceReads;
@@ -66,6 +68,7 @@ public sealed class FakeInfrastructure : IInfrastructure
     public Task<HashSet<int>> BoundPorts(string id, string ip, CancellationToken ct) => Task.FromResult(ExtraPorts.ToHashSet());
     public Task Start(string id, string ip, Instance inst, CancellationToken ct)
     {
+        foreach(var pair in inst.CommonConfigs??new())Configurations[(inst.Id,pair.Key)]=pair.Key=="Server.cfg"?SquadConfig.Identity(pair.Value,inst.Name,inst.Password,inst.MaxPlayers):pair.Value;
         Starts++; Containers.Add(new(inst.Id, true, inst.Ports.All));
         if (FailStartAfterCreating) throw new IOException("Lost SSH response"); return Task.CompletedTask;
     }

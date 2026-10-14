@@ -22,13 +22,13 @@ public partial class MainWindow
         if (OwnServers.ItemsSource is not List<InstanceView> previous || !previous.Select(i => (i.Id,i.Name)).SequenceEqual(owned.Select(i => (i.Id,i.Name)))) OwnServers.ItemsSource = owned;
         OwnServers.SelectedValue = selectedId;
         selecting = false;
-        var show = !draft && Tabs.SelectedItem != SharedHostTab && owned.Count > 0;
+        var show = !draft && Tabs.SelectedItem != SharedHostTab && Tabs.SelectedItem != ConfigurationTab && owned.Count > 0;
         OwnServerLabel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         OwnServers.Visibility = show && owned.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         OwnSingleName.Visibility = show && owned.Count == 1 ? Visibility.Visible : Visibility.Collapsed;
         OwnSingleName.Text = owned.Count == 1 ? owned[0].Name : "";
-        AdminEditorPanel.IsEnabled = Mine != null && adminsLoadedId == Mine.Id;
-        NoServerHelpVisibility=Mine==null && Tabs.SelectedIndex is 2 or 3 or 5 or 6 or 9?Visibility.Visible:Visibility.Collapsed;
+        AdminEditorPanel.IsEnabled = adminsLoadedId == AdminTarget;
+        NoServerHelpVisibility=Mine==null && Tabs.SelectedIndex is 2 or 3 or 6 or 9?Visibility.Visible:Visibility.Collapsed;
     }
     private void ClearInstanceViews()
     {
@@ -133,27 +133,28 @@ public partial class MainWindow
         ServerPassword.Clear(); displayedInstance = null; await Refresh(); Status.Text = L("restartSettingsHelp");
     });
     private async void LoadAdminsClick(object sender, RoutedEventArgs e) => await Safe(LoadAdmins);
+    private string AdminTarget => Mine?.Id ?? "defaults";
     private async Task LoadAdmins()
     {
-        var id = RequiredMine().Id; var output = await Post<System.Text.Json.JsonElement>($"api/instances/{id}/config", new ConfigRequest("Admins.cfg"));
-        if (Mine?.Id != id) return; AdminsEditor.Text = output.GetProperty("output").GetString(); adminsLoadedId = id; adminsOriginal = AdminsEditor.Text; AdminEditorPanel.IsEnabled = true; Status.Text = L("fileLoaded", "Admins.cfg");
+        var id = AdminTarget; var output = await Post<System.Text.Json.JsonElement>(id=="defaults"?"api/server-defaults/config":$"api/instances/{id}/config", new ConfigRequest("Admins.cfg"));
+        if (AdminTarget != id) return; AdminsEditor.Text = output.GetProperty("output").GetString(); adminsLoadedId = id; adminsOriginal = AdminsEditor.Text; AdminEditorPanel.IsEnabled = true; Status.Text = L("fileLoaded", "Admins.cfg");
     }
     private async void SaveAdminsClick(object sender, RoutedEventArgs e) => await Safe(SaveAdmins);
     private async Task SaveAdmins()
     {
-        var mine=RequiredMine();if(adminsLoadedId!=mine.Id)throw new InputException(L("loadFirst"));
+        var id=AdminTarget;if(adminsLoadedId!=id)throw new InputException(L("loadFirst"));
         var content=AdminsEditor.Text;
         AdminEditorPanel.IsEnabled=false;
         try
         {
-            await Post<System.Text.Json.JsonElement>($"api/instances/{mine.Id}/config",new ConfigRequest("Admins.cfg",content));
-            if(Mine?.Id==mine.Id){adminsOriginal=content;Status.Text=L("fileSaved");}
+            await Post<System.Text.Json.JsonElement>(id=="defaults"?"api/server-defaults/config":$"api/instances/{id}/config",new ConfigRequest("Admins.cfg",content));
+            if(AdminTarget==id){adminsOriginal=content;Status.Text=L("fileSaved");}
         }
-        finally{AdminEditorPanel.IsEnabled=Mine?.Id==adminsLoadedId;}
+        finally{AdminEditorPanel.IsEnabled=AdminTarget==adminsLoadedId;}
     }
     private async void AddAdminClick(object sender, RoutedEventArgs e) => await Safe(async () =>
     {
-        if (Mine?.Id != adminsLoadedId || adminsLoadedId == null) { Status.Text = L("loadFirst"); return; }
+        if (AdminTarget != adminsLoadedId || adminsLoadedId == null) { Status.Text = L("loadFirst"); return; }
         var id = AdminSteamId.Text.Trim(); var group = (AdminGroup.SelectedItem as string ?? "").Trim();
         if (!Regex.IsMatch(id, @"^7656119\d{10}$") || !Regex.IsMatch(group, @"^[\p{L}\p{N}_ -]{1,40}$")) { Status.Text = L("invalidAdmin"); return; }
         if (!Regex.IsMatch(AdminsEditor.Text, @"(?im)^\s*Group=" + Regex.Escape(group) + @":.*$")) { Status.Text = L("groupMissing"); return; }
@@ -224,7 +225,7 @@ public partial class MainWindow
     { if (AdminMembers.SelectedItem is AdminMemberRow row) { AdminSteamId.Text = row.SteamId; AdminGroup.SelectedItem = row.Group; } }
     private async void SetGroupClick(object sender, RoutedEventArgs e) => await Safe(async () =>
     {
-        if (Mine?.Id != adminsLoadedId || adminsLoadedId == null) { Status.Text = L("loadFirst"); return; }
+        if (AdminTarget != adminsLoadedId || adminsLoadedId == null) { Status.Text = L("loadFirst"); return; }
         var name = GroupNameInput.Text.Trim(); var permissions = ReadPermissionSelection();
         if (!Regex.IsMatch(name, @"^[\p{L}\p{N}_ -]{1,40}$") || permissions.Length == 0) { Status.Text = L("groupEditHelp"); return; }
         var pattern = @"(?im)^\s*Group=" + Regex.Escape(name) + @":[^\r\n]*"; var line = $"Group={name}:{permissions}";
@@ -235,14 +236,14 @@ public partial class MainWindow
     { AdminGroups.SelectedItem = null; GroupNameInput.Clear(); GroupPermissionsInput.Clear(); SetPermissionSelection(""); }
     private async void RemoveAdminClick(object sender, RoutedEventArgs e) => await Safe(async () =>
     {
-        if (Mine?.Id != adminsLoadedId || adminsLoadedId == null) { Status.Text = L("loadFirst"); return; }
+        if (AdminTarget != adminsLoadedId || adminsLoadedId == null) { Status.Text = L("loadFirst"); return; }
         var id = AdminSteamId.Text.Trim(); if (!Regex.IsMatch(id, @"^\d{17}$")) { Status.Text = L("invalidAdmin"); return; }
         AdminsEditor.Text = Regex.Replace(AdminsEditor.Text, @"(?im)^\s*Admin=" + Regex.Escape(id) + @":[^\r\n]*\r?\n?", ""); AdminSteamId.Clear(); AdminMembers.SelectedItem = null; AdminGroup.SelectedItem = null; await SaveAdmins();
     });
 
     private async void RemoveGroupClick(object sender, RoutedEventArgs e) => await Safe(async () =>
     {
-        if (Mine?.Id != adminsLoadedId || adminsLoadedId == null) { Status.Text=L("loadFirst");return; }
+        if (AdminTarget != adminsLoadedId || adminsLoadedId == null) { Status.Text=L("loadFirst");return; }
         var name=GroupNameInput.Text.Trim();if(!Regex.IsMatch(name,@"^[\p{L}\p{N}_ -]{1,40}$")){Status.Text=L("groupEditHelp");return;}
         if(Regex.IsMatch(AdminsEditor.Text,@"(?im)^\s*Admin=\d+:"+Regex.Escape(name)+@"(?:\s*(?://.*)?)?$")){Status.Text=L("groupInUse");return;}
         AdminsEditor.Text=Regex.Replace(AdminsEditor.Text,@"(?im)^\s*Group="+Regex.Escape(name)+@":[^\r\n]*\r?\n?","");ClearGroupInputs();await SaveAdmins();

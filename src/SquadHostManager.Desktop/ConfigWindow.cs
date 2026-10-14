@@ -9,13 +9,13 @@ public sealed class ConfigWindow : Window
 {
     private sealed record VersionRow(ConfigVersion Value){public override string ToString()=>Value.At.ToLocalTime().ToString("g");}
     private sealed record ConfigFile(string Name, string Label) { public override string ToString() => Label + " · " + Name; }
-    public ConfigWindow(Func<ConfigRequest, Task<string>> send,Func<string,Task<List<ConfigVersion>>>? versions=null,Func<string,Task<string>>? restore=null)
+    public ConfigWindow(Func<ConfigRequest, Task<string>> send,Func<string,Task<List<ConfigVersion>>>? versions=null,Func<string,Task<string>>? restore=null,bool defaults=false)
     {
         Title = Localization.T("config"); Width = 880; Height = 660; MinWidth = 650; MinHeight = 450; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var panel = new DockPanel { Margin = new Thickness(20) }; Content = panel;
         var top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); panel.Children.Add(top);
-        top.Children.Add(new TextBlock { Text = Localization.T("configHelp"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,12) });
-        string[] names = ["LayerRotation.cfg","LevelRotation.cfg","ExcludedFactions.cfg","ExcludedLayers.cfg","ExcludedLevels.cfg","LayerVoting.cfg","LayerVotingLowPlayers.cfg","LayerVotingNight.cfg","VoteConfig.cfg","MOTD.cfg","ServerMessages.cfg","Bans.cfg","RemoteAdminListHosts.cfg","RemoteBanListHosts.cfg","CustomOptions.cfg","License.cfg","Admins.cfg"];
+        top.Children.Add(new TextBlock { Text = Localization.T(defaults?"preRentalConfigHelp":"configHelp"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,12) });
+        string[] names = ["Server.cfg","LayerRotation.cfg","LevelRotation.cfg","ExcludedFactions.cfg","ExcludedLayers.cfg","ExcludedLevels.cfg","LayerVoting.cfg","LayerVotingLowPlayers.cfg","LayerVotingNight.cfg","VoteConfig.cfg","MOTD.cfg","ServerMessages.cfg","Bans.cfg","RemoteAdminListHosts.cfg","RemoteBanListHosts.cfg","CustomOptions.cfg","ModsConfig.cfg","License.cfg","Admins.cfg"];
         var file = new ComboBox { ItemsSource = names.Select(n => new ConfigFile(n,Localization.T("cfg_"+n.Split('.')[0]))).ToList(),SelectedIndex=0,Margin=new(0,0,0,12) };top.Children.Add(file);
         var buttons = new WrapPanel();top.Children.Add(buttons);
         Button Button(string key){var b=new Button{Content=Localization.T(key),Padding=new(12,6,12,6),Margin=new(0,0,12,12)};buttons.Children.Add(b);return b;}

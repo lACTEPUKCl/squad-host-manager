@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     public MainWindow() : this(!Environment.GetCommandLineArgs().Contains("--no-session")) { }
     public MainWindow(bool restoreSession)
     {
-        Localization.Initialize(); InitializeComponent();Width=Math.Min(1640,SystemParameters.WorkArea.Width*0.94);Height=Math.Min(1040,SystemParameters.WorkArea.Height*0.94);Tabs.SizeChanged+=(_,e)=>{var compact=e.NewSize.Height<780;if(CompactSidebar!=compact){CompactSidebar=compact;if(Tabs.Template.FindName("NavigationScroll",Tabs) is ScrollViewer navigation)navigation.ScrollToTop();}};InitializeDraftSaving();BuildFeatures();RefreshSharedProfiles(); InitializePermissions(); RenderPlayers([]); RefreshColumnHeaders();Closed+=(_,_)=>availabilityTray?.Dispose();
+        Localization.Initialize(); InitializeComponent();Width=Math.Min(1640,SystemParameters.WorkArea.Width*0.94);Height=Math.Min(1040,SystemParameters.WorkArea.Height*0.94);Tabs.SizeChanged+=(_,e)=>{var compact=e.NewSize.Height<900;if(CompactSidebar!=compact){CompactSidebar=compact;if(Tabs.Template.FindName("NavigationScroll",Tabs) is ScrollViewer navigation)navigation.ScrollToTop();}};InitializeDraftSaving();BuildFeatures();RefreshSharedProfiles(); InitializePermissions(); RenderPlayers([]); RefreshColumnHeaders();Closed+=(_,_)=>availabilityTray?.Dispose();
         VersionLabel.Text = L("developmentVersion");
         AboutVersion.Text="Squad Server Manager · "+System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion.Split('+')[0];
         if(restoreSession)ContentRendered+=async(_,_)=>{if(startupUpdatesChecked)return;startupUpdatesChecked=true;await CheckAppUpdates(true);};
@@ -117,7 +117,7 @@ public partial class MainWindow : Window
         draftSaveTimer.Stop();draftPersistenceReady=false;
         if (hub != null) await hub.DisposeAsync(); http?.Dispose(); session = value;
         var uri = BaseUri();var pin=certificateSha256; http = HostingTransport.Client(uri,pin);
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", value.Token); await Refresh();using(var defaultsResponse=await http.GetAsync("api/server-defaults")){if(defaultsResponse.IsSuccessStatusCode){var savedDefaults=await defaultsResponse.Content.ReadFromJsonAsync<ServerDefaults>();defaultMods=savedDefaults?.Mods??"";if(Mine==null)Mods.Text=defaultMods;else if(savedDefaults?.Admins==null && pool?.Host.Phase=="ready" && Mine.Phase is "running" or "stopped" or "error"){using var currentAdmins=await http.PostAsJsonAsync($"api/instances/{Mine.Id}/config",new ConfigRequest("Admins.cfg"));}}}RestoreServerDraft();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", value.Token); await Refresh();using(var defaultsResponse=await http.GetAsync("api/server-defaults")){if(defaultsResponse.IsSuccessStatusCode){var savedDefaults=await defaultsResponse.Content.ReadFromJsonAsync<ServerDefaults>();defaultMods=savedDefaults?.Mods??"";if(Mine==null)Mods.Text=defaultMods;else if(savedDefaults?.Admins==null && pool?.Host.Phase=="ready" && Mine.Phase is "running" or "stopped" or "error"){using var currentAdmins=await http.PostAsJsonAsync($"api/instances/{Mine.Id}/config",new ConfigRequest("Admins.cfg"));}}}using(var configResponse=await http.PostAsJsonAsync("api/server-defaults/config",new ConfigRequest("Server.cfg"))){if(configResponse.IsSuccessStatusCode && Mine==null){var config=(await configResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("output").GetString()??"";MaxPlayers.Text=SquadConfig.Get(config,"MaxPlayers")??MaxPlayers.Text;}}RestoreServerDraft();
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Settings)!);
         System.IO.File.WriteAllBytes(Settings, ProtectedData.Protect(JsonSerializer.SerializeToUtf8Bytes(new Saved(uri.ToString(), value,rememberedInvitation,pin)), null, DataProtectionScope.CurrentUser));
         hub = new HubConnectionBuilder().WithUrl(new Uri(uri, "events"), o =>
@@ -279,11 +279,7 @@ public partial class MainWindow : Window
         try{await using(var file=System.IO.File.Create(temporary)){await response.Content.CopyToAsync(file);}System.IO.File.Move(temporary,dialog.FileName,true);Status.Text=L("archiveSaved");}
         finally{if(System.IO.File.Exists(temporary))System.IO.File.Delete(temporary);}
     });
-    private void ConfigClick(object sender, RoutedEventArgs e)
-    {
-        if (Mine == null) { Status.Text = L("startFirst"); return; }
-        var id = Mine.Id; new ConfigWindow(async r => (await Post<JsonElement>($"api/instances/{id}/config", r)).GetProperty("output").GetString() ?? "",async file=>{using var response=await http!.GetAsync($"api/instances/{id}/versions?file="+Uri.EscapeDataString(file));await Check(response);return (await response.Content.ReadFromJsonAsync<List<ConfigVersion>>())!;},async version=>(await Post<JsonElement>($"api/instances/{id}/versions/{version}/restore",new{})).GetProperty("output").GetString()??"") { Owner = this }.ShowDialog();
-    }
+    private void ConfigClick(object sender, RoutedEventArgs e) => OpenConfiguration();
     private async void AdoptClick(object sender, RoutedEventArgs e) => await Safe(async () => { using var response = await http!.PostAsJsonAsync("api/admin/adopt", new { hostId = ExistingHostId.Text.Trim() }); await Check(response); await Refresh(); });
     private async void RecoveryClick(object sender, RoutedEventArgs e) => await Safe(async () => { using var response = await http!.PostAsJsonAsync("api/admin/recover", new { }); await Check(response); await Refresh(); });
     private async Task RefreshUsers() { if (session?.IsAdmin != true) return; using var response = await http!.GetAsync("api/admin/users"); await Check(response); Users.ItemsSource = (await response.Content.ReadFromJsonAsync<List<UserAccessView>>())!.Select(u => new UserRow(u)).ToList(); }
@@ -309,7 +305,7 @@ public partial class MainWindow : Window
     private void LanguageChanged(object sender, SelectionChangedEventArgs e)
     {
         if (LanguagePicker?.SelectedItem is not ComboBoxItem item || item.Tag is not string language) return;
-        Localization.Apply(language); BuildFeatures(); if (Workspace != null) { VersionLabel.Text = L("developmentVersion"); RenderPool(); RefreshPermissionLabels(); RefreshColumnHeaders(); RenderPlayers(currentPlayers,true); RenderFiles(); RentalCities.Items.Refresh(); }
+        Localization.Apply(language); configurationEditor?.RefreshLanguage();BuildFeatures(); if (Workspace != null) { VersionLabel.Text = L("developmentVersion"); RenderPool(); RefreshPermissionLabels(); RefreshColumnHeaders(); RenderPlayers(currentPlayers,true); RenderFiles(); RentalCities.Items.Refresh(); }
         if(costChartReport!=null)RenderCostStatistics(costChartReport);
         if(HostingModeHelp!=null)HostingModeHelp.Text=L(PersonalHosting?"personalModeHelp":session?.IsAdmin==true?"sharedOwnerModeHelp":"sharedModeHelp");PersonalAccountButton.Visibility=PersonalHosting?Visibility.Visible:Visibility.Collapsed;
         if (session?.IsAdmin == true && !PersonalHosting) _ = Safe(RefreshUsers);

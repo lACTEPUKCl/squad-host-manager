@@ -1,0 +1,25 @@
+{
+  "source": "Squad Dedicated Server, Steam app 403240, unmodified installation cache",
+  "captured": "2026-10-14",
+  "sha256": {
+    "Admins.cfg": "5ca0bd343ff1d7adba6722ad5ead13fedfd388efb791517b8117d911919fcd80",
+    "Bans.cfg": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "CustomOptions.cfg": "c7e4a567f318b7649ef3abdcaa47e3bf9d42e60ce3b9836b772815d79c68e163",
+    "ExcludedFactions.cfg": "439e0b51dd5e84ac56d208117ad1732444935c04236b2b579cacf72b0e517645",
+    "ExcludedLayers.cfg": "cdf663f561cad48f88dabf6d95db66644842a8b77bac18bd66a146023321205d",
+    "ExcludedLevels.cfg": "fa2df6a3225f99db4f3d3f32d39907634d73a2169ea1a1c2dc7b858fb1d17824",
+    "LayerRotation.cfg": "f12fc5d8801aa5aea58638bd2c0d11483ce48c901f8d73eb0ff8691d006d7da8",
+    "LayerVoting.cfg": "0bca0bbb4ee929d0c978790e61e7a100406ae5b18e3b561af727ad6743c5a370",
+    "LayerVotingLowPlayers.cfg": "271e343dfe6bf2fb5b547533f007773d9b9f751856de84c9a076707b69e2d754",
+    "LayerVotingNight.cfg": "d7e0afae4940eb5612e0de19eb891010ec62a47affac67d553128830318cc0da",
+    "LevelRotation.cfg": "0b36643de96df52cac10f0225fdb6bb69f21105509bd16ddf734f1a4de7a961a",
+    "License.cfg": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ModsConfig.cfg": "14db23189253d4c350f29310cc6bce0ce25b90d651958b4b470c290ea85c7851",
+    "MOTD.cfg": "77fb67c0f64a1b0f4fac7ed94d2798a8931d7d569a401eb232f3f4a9bb64bb66",
+    "RemoteAdminListHosts.cfg": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "RemoteBanListHosts.cfg": "d6e329b0be176315f039cbae5293e06ac7425ce4296a574ec8370641ae90bdfb",
+    "Server.cfg": "409f74a61ac565f2863bfef7b4e7fbd9598def7d571fa49092572eea0b1af10b",
+    "ServerMessages.cfg": "47b832fa637b65d0b29e78cd8dbd0dfaf348ae012c527ac418f85e3204afe510",
+    "VoteConfig.cfg": "ac56cd80c89ec5008b8b33f9650d21c778a7e062b56fbc074d6921ee4983e586"
+  }
+}

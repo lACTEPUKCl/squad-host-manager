@@ -21,6 +21,7 @@ public static class BackupFormat
         var entry=zip.GetEntry("manifest.json")!;if(entry.Length>2*1024*1024)throw new ArgumentException("Неверный размер настроек.");
         using var stream=entry.Open();var manifest=JsonSerializer.Deserialize<BackupManifest>(stream)??throw new ArgumentException("Нет настроек копии.");
         if(manifest.Format!=1 || manifest.Name is null || manifest.Name.Length is <1 or >80 || manifest.Configs is null || manifest.Configs.Count>RemoteDocker.ConfigFiles.Length || manifest.Configs.Any(c=>!RemoteDocker.ConfigFiles.Contains(c.Key) || c.Value is null || c.Value.Length>20000 || c.Value.Contains('\0')))throw new ArgumentException("Недопустимые настройки копии.");
+        if(manifest.Configs.TryGetValue("Server.cfg",out var mainConfig))SquadConfig.Validate(mainConfig);
         var s=manifest.Settings;if(s is null || s.Name is null || s.Name.Length is <3 or >80 || s.Mods is null || (s.Password?.Length??0)>128 || s.MaxPlayers is <1 or >100 || s.Mods.Length>500 || (s.StartLayer?.Length??0)>200)throw new ArgumentException("Недопустимые параметры сервера.");
         return manifest;
     }

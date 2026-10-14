@@ -21,7 +21,7 @@ public partial class MainWindow
         if(busy || refreshing || backgroundRefreshing) { pendingSnapshot=true; return; }
         if(DateTimeOffset.UtcNow-lastBackgroundRefresh<TimeSpan.FromSeconds(3))return;
         pendingSnapshot=false;backgroundRefreshing=true;lastBackgroundRefresh=DateTimeOffset.UtcNow;
-        try { await RestoreEvents(); await Refresh(); await LoadBalance(); await RefreshLocationAvailability(); if(featureApiAvailable && DateTimeOffset.UtcNow-lastBackgroundFeatures>=TimeSpan.FromSeconds(30)){lastBackgroundFeatures=DateTimeOffset.UtcNow;await LoadFeatures();} if(Tabs.SelectedIndex==5 && adminsLoadedId!=Mine?.Id && Mine?.Phase is "running" or "stopped") await LoadAdmins(); if (logs && Tabs.SelectedIndex==2 && FollowLogs.IsChecked == true && Mine?.Phase is "running" or "starting" or "restarting" or "error") await LoadLogs(); if(Tabs.SelectedIndex==3 && Mine?.GameState=="gameReady") await RefreshPlayers(); if(Tabs.SelectedItem==StatisticsTab && session?.IsAdmin==true)await LoadStatistics(); }
+        try { await RestoreEvents(); await Refresh(); await LoadBalance(); await RefreshLocationAvailability(); if(featureApiAvailable && DateTimeOffset.UtcNow-lastBackgroundFeatures>=TimeSpan.FromSeconds(30)){lastBackgroundFeatures=DateTimeOffset.UtcNow;await LoadFeatures();} if(Tabs.SelectedIndex==5 && adminsLoadedId!=AdminTarget && (Mine==null || Mine.Phase is "running" or "stopped")) await LoadAdmins(); if (logs && Tabs.SelectedIndex==2 && FollowLogs.IsChecked == true && Mine?.Phase is "running" or "starting" or "restarting" or "error") await LoadLogs(); if(Tabs.SelectedIndex==3 && Mine?.GameState=="gameReady") await RefreshPlayers(); if(Tabs.SelectedItem==StatisticsTab && session?.IsAdmin==true)await LoadStatistics(); }
         catch(RequestException e) when(e.Code==System.Net.HttpStatusCode.TooManyRequests){backgroundRetryAt=DateTimeOffset.UtcNow.AddSeconds(30);}
         catch (Exception e) { Status.Text = e is InputException ? e.Message : e is RequestException request ? request.UserMessage : e is HttpRequestException ? L("networkLost") : L("actionFailed"); ErrorDetails.Text = e.Message; ErrorPanel.Visibility = Visibility.Visible; }
         finally { backgroundRefreshing=false;if(pendingSnapshot && !busy && http!=null) _ = Dispatcher.BeginInvoke(new Action(async()=>await BackgroundRefresh())); }
@@ -48,7 +48,8 @@ public partial class MainWindow
         if (e.Source != Tabs) return;
         if(PageHeading!=null && Tabs.SelectedItem is TabItem page)PageHeading.Text=page.Header?.ToString()??"";
         if (pool != null) RenderSelection();
-        if (http == null || Mine == null && Tabs.SelectedItem!=StatisticsTab && Tabs.SelectedItem!=FeaturesTab || loadingTab) return;
+        if(Tabs.SelectedItem==ConfigurationTab && http!=null){if(configurationEditor==null || configurationContext!=ConfigurationContext)BuildConfigurationPage();return;}
+        if (http == null || Mine == null && Tabs.SelectedItem!=StatisticsTab && Tabs.SelectedItem!=FeaturesTab && Tabs.SelectedIndex!=5 || loadingTab) return;
         loadingTab = true;
         try
         {
@@ -58,7 +59,7 @@ public partial class MainWindow
                 else if (Tabs.SelectedIndex == 2 && Mine?.Phase is "running" or "starting" or "restarting" or "error") await LoadLogs();
                 else if (Tabs.SelectedIndex == 3 && Mine?.GameState == "gameReady") await RefreshPlayers();
                 else if (Tabs.SelectedIndex == 4) await RefreshModDetails();
-                else if (Tabs.SelectedIndex == 5 && adminsLoadedId != Mine?.Id && Mine?.Phase is "running" or "stopped") await LoadAdmins();
+                else if (Tabs.SelectedIndex == 5 && adminsLoadedId != AdminTarget && (Mine==null || Mine.Phase is "running" or "stopped")) await LoadAdmins();
                 else if (Tabs.SelectedIndex == 6 && filesLoadedId != Mine?.Id && Mine?.Phase is "running" or "stopped") await LoadFiles();
                 else if (Tabs.SelectedIndex == 10 && session?.IsAdmin==true) await LoadStatistics();
                 else if (Tabs.SelectedIndex == 9 && Mine?.GameState == "gameReady") { await RefreshLayers(); await LoadMatchCommands(); }
@@ -140,7 +141,7 @@ public partial class MainWindow
         }
         UpdateModList();
     }
-    private static readonly string[] Permissions = ["changemap","cheat","private","config","clientdemos","pause","canseeadminchat","teamchange","forceteamchange","chat","kick","ban","balance","immune","manageserver","featuretest","reserve","demos","debug","cameraman"];
+    internal static readonly string[] Permissions = ["changemap","cheat","private","config","clientdemos","pause","canseeadminchat","teamchange","forceteamchange","chat","kick","ban","balance","immune","manageserver","featuretest","reserve","demos","debug","cameraman"];
     private string[] unknownPermissions = [];
     private void InitializePermissions()
     {

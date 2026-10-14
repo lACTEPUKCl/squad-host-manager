@@ -21,6 +21,33 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> rconLocks = new();
     public event Action? Changed;
     public ServerDefaults Defaults(User user){lock(gate)return store.Load<ServerDefaults>("server-defaults-"+user.Id)??new(state.Instances.Where(i=>i.OwnerId==user.Id).OrderByDescending(i=>i.StartedAt).FirstOrDefault()?.Mods??"");}
+    private Dictionary<string,string> CommonConfigs(User user)
+    {
+        var saved=Defaults(user);var configs=StandardConfigs.Copy();
+        foreach(var pair in store.Load<Dictionary<string,string>>("game-standard-configs")??new())if(RemoteDocker.ConfigFiles.Contains(pair.Key))configs[pair.Key]=pair.Value;
+        foreach(var pair in saved.Configs??new())configs[pair.Key]=pair.Value;
+        if(saved.Admins!=null)configs["Admins.cfg"]=saved.Admins;
+        configs["Server.cfg"]=StandardConfigs.SharedServer(configs["Server.cfg"]);
+        return configs;
+    }
+    public string DefaultConfig(User user,ConfigRequest request)
+    {
+        if(!RemoteDocker.ConfigFiles.Contains(request.File) || request.Content?.Length>20000 || request.Content?.Contains('\0')==true)throw new ArgumentException("Недопустимый конфиг.");
+        lock(gate)
+        {
+            if(request.Content==null)return CommonConfigs(user).GetValueOrDefault(request.File,"");
+            var content=request.File=="Server.cfg"?StandardConfigs.SharedServer(request.Content):request.Content;
+            if(request.File=="Server.cfg")SquadConfig.Validate(content);
+            var before=CommonConfigs(user).GetValueOrDefault(request.File,"");if(before!=content)RememberCommonConfig(user,request.File,before);
+            var prior=Defaults(user);var configs=new Dictionary<string,string>(prior.Configs??new());configs[request.File]=content;
+            store.Save("server-defaults-"+user.Id,prior with{Configs=configs,Admins=request.File=="Admins.cfg"?content:prior.Admins});
+            foreach(var instance in state.Instances.Where(i=>i.OwnerId==user.Id))
+            {
+                if(request.File=="Server.cfg"){instance.ServerConfig=content;if(int.TryParse(SquadConfig.Get(content,"MaxPlayers"),out var players))instance.MaxPlayers=players;}
+            }
+            Save();return content;
+        }
+    }
     private void RememberMods(User user,string mods){var prior=Defaults(user);store.Save("server-defaults-"+user.Id,prior with{Mods=mods});}
 
     public OperationView RetryHostPreparation(User user,RestartRequest request)
@@ -219,8 +246,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
             if(request.StartLayer!=null)inst.StartLayer=request.StartLayer;
             inst.Mods = string.Join(' ', Regex.Matches(request.Mods, @"\d+").Select(m => m.Value).Distinct());
             RememberMods(user,request.Mods);
-            if(request.InstanceId==null && Defaults(user).Admins is {} defaultAdmins)inst.TemplateConfigs=new(){["Admins.cfg"]=defaultAdmins};
-            inst.ReadyNotified=false; inst.StartedAt = DateTimeOffset.UtcNow; inst.MaxPlayers = request.MaxPlayers; inst.Slot = slot; inst.Ports = PortSet.ForSlot(slot); inst.Phase = "queued"; inst.Error = null; inst.GameState = null; inst.DownloadPercent = null;
+            inst.ReadyNotified=false; inst.StartedAt = DateTimeOffset.UtcNow; inst.MaxPlayers = Defaults(user).Configs?.TryGetValue("Server.cfg",out var commonMain)==true && int.TryParse(SquadConfig.Get(commonMain,"MaxPlayers"),out var commonPlayers)?commonPlayers:request.MaxPlayers; inst.Slot = slot; inst.Ports = PortSet.ForSlot(slot); inst.Phase = "queued"; inst.Error = null; inst.GameState = null; inst.DownloadPercent = null;
             var op = new Operation { Id = request.RequestId.ToString("N"), UserId = user.Id, InstanceId = inst.Id, Kind = "start", ExpectedHostId=state.HostId };
             state.Operations.Add(op); state.LastEvent = $"{user.Name}: запуск {inst.Name} поставлен в очередь"; Save(); return View(op);
         }
@@ -360,7 +386,19 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     private async Task StartRemote(Operation op, CancellationToken ct)
     {
         await EnsureHost(op, ct);
-        Instance inst; lock (gate) inst = state.Instances.Single(i => i.Id == op.InstanceId);
+        if(store.Load<string>("game-standard-config-host")!=state.HostId)
+        {
+            var downloaded=await infra.DownloadedConfigs(state.HostId!,state.Ip!,ct);
+            if(downloaded.Count>0){store.Save("game-standard-configs",downloaded);store.Save("game-standard-config-host",state.HostId!);}
+        }
+        Instance inst; lock (gate)
+        {
+            inst = state.Instances.Single(i => i.Id == op.InstanceId);
+            if(inst.TemplateConfigs is {} imported)foreach(var pair in imported)DefaultConfig(new(inst.OwnerId,inst.OwnerName,false),new(pair.Key,pair.Value));
+            inst.CommonConfigs=CommonConfigs(new(inst.OwnerId,inst.OwnerName,false));
+            inst.ServerConfig=inst.CommonConfigs["Server.cfg"];
+            if(inst.TemplateConfigs?.Remove("Server.cfg",out var configured)==true){SquadConfig.Validate(configured);inst.ServerConfig=configured;Save();}
+        }
         var cpuSets = await infra.CpuSets(state.HostId!,state.Ip!,ct);
         lock(gate)state.CpuCapacity=cpuSets.Count;
         var inventory = await infra.Inventory(state.HostId!, state.Ip!, ct);
@@ -530,17 +568,31 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     public async Task<string> Config(User user, string id, ConfigRequest request, CancellationToken ct)
     {
         if(!RemoteDocker.ConfigFiles.Contains(request.File) || request.Content?.Length>20000 || request.Content?.Contains('\0')==true)throw new ArgumentException("Недопустимый конфиг.");
+        if(request.File=="Server.cfg" && request.Content!=null)SquadConfig.Validate(request.Content);
         await worker.WaitAsync(ct);
         try
         {
             Instance inst; lock (gate) inst = state.Instances.Find(i => i.Id == id && i.OwnerId == user.Id && i.Phase is "running" or "stopped" or "error") ?? throw new UnauthorizedAccessException("Настройки доступны только для своего запущенного сервера.");
+            if(request.File=="Server.cfg" && request.Content==null)
+            {
+                var content=inst.ServerConfig??await infra.Config(state.HostId!,state.Ip!,inst.Id,request,ct);
+                lock(gate){inst.ServerConfig=content;Save();}
+                return SquadConfig.Identity(content,inst.Name,inst.Password,inst.MaxPlayers);
+            }
             if(request.Content!=null)
             {
                 var before=await infra.Config(state.HostId!,state.Ip!,inst.Id,new(request.File),ct);
                 lock(gate){var version=Guid.NewGuid().ToString("N");store.Save("config-version-"+version,before);state.Versions.Add(new(user.Id,new(version,id,request.File,DateTimeOffset.UtcNow,"")));TrimVersions(id,request.File);Save();}
             }
             var result=await infra.Config(state.HostId!, state.Ip!, inst.Id, request, ct);
-            if(request.File=="Admins.cfg" && (request.Content!=null || Defaults(user).Admins==null))store.Save("server-defaults-"+user.Id,Defaults(user) with{Admins=request.Content??result});
+            if(request.File=="Server.cfg" && request.Content!=null)
+            {
+                DefaultConfig(user,new("Server.cfg",request.Content));
+                lock(gate){inst.Name=SquadConfig.Get(request.Content,"ServerName")??inst.Name;inst.Password=SquadConfig.Get(request.Content,"ServerPassword")??inst.Password;if(int.TryParse(SquadConfig.Get(request.Content,"MaxPlayers"),out var players))inst.MaxPlayers=players;Save();}
+                return result;
+            }
+            if(request.Content!=null)DefaultConfig(user,request);
+            else if(request.File=="Admins.cfg" && Defaults(user).Admins==null)DefaultConfig(user,new("Admins.cfg",result));
             if(request.Content==null || inst.Phase!="running")return result;
             var commandLock=rconLocks.GetOrAdd(inst.Id,_=>new(1,1));
             try

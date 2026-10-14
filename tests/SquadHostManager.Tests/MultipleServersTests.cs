@@ -67,7 +67,7 @@ public sealed class MultipleServersTests
         using var f = new Fixture(); f.Pool.Start(Fixture.User(0), new(Guid.NewGuid(), "Original", "secret", "2848273764", 20)); await f.Drain(1);
         var original = f.Pool.Snapshot(Fixture.User(0)).Instances.Single();
         f.Pool.Stop(Fixture.User(0), new(Guid.NewGuid(), false, original.Id)); await f.Drain(1);
-        Assert.Equal("config", await f.Pool.Config(Fixture.User(0), original.Id, new("Admins.cfg"), default));
+        Assert.Equal(StandardConfigs.Get("Admins.cfg"), await f.Pool.Config(Fixture.User(0), original.Id, new("Admins.cfg"), default));
         Assert.Empty(await f.Pool.Archive(Fixture.User(0), original.Id, default));
         f.Start(0); await f.Drain(1);
         f.Pool.Start(Fixture.User(0), new(Guid.NewGuid(), "Original", null, "2848273764", 20, original.Id)); await f.Drain(1);

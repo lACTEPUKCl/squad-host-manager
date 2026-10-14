@@ -3,6 +3,17 @@ using SquadHostManager.Service;
 namespace SquadHostManager.Tests;
 public class ServerDefaultsTests
 {
+    [Fact] public async Task ConfigCanBePreparedBeforeRentalAndSurvivesRestart()
+    {
+        using var f=new Fixture();var owner=Fixture.User(1);var admins="Group=Owner:chat,kick\nAdmin=76561198000000001:Owner\n";
+        f.Pool.DefaultConfig(owner,new("Admins.cfg",admins));f.Pool.DefaultConfig(owner,new("MOTD.cfg","Welcome"));
+        var restored=new PoolCoordinator(f.Store,f.Infra);
+        Assert.Equal(admins,restored.DefaultConfig(owner,new("Admins.cfg")));Assert.Equal(StandardConfigs.Get("MOTD.cfg"),restored.DefaultConfig(Fixture.User(2),new("MOTD.cfg")));
+        Assert.Throws<ArgumentException>(()=>restored.DefaultConfig(owner,new("../Server.cfg","bad")));
+        Assert.Throws<ArgumentException>(()=>restored.DefaultConfig(owner,new("MOTD.cfg",new string('x',20001))));
+        restored.Start(owner,new(Guid.NewGuid(),"Prepared","",""));await restored.ProcessNext(default);
+        var server=restored.Snapshot(owner).Instances.Single();Assert.Equal("Welcome",f.Infra.Configurations[(server.Id,"MOTD.cfg")]);Assert.Equal(admins,f.Infra.Configurations[(server.Id,"Admins.cfg")]);
+    }
     [Fact] public async Task DefaultsPersistAndApplyAdminsOnlyToOwnersNewServers()
     {
         using var f=new Fixture();f.Pool.Start(Fixture.User(1),new(Guid.NewGuid(),"First","","3816653940"));await f.Drain(1);

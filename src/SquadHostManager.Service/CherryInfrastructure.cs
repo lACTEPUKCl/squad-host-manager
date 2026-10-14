@@ -170,6 +170,7 @@ public sealed class CherryInfrastructure : IInfrastructure, IDisposable
     public Task Stop(string hostId, string ip, string instanceId, CancellationToken ct) => docker.Stop(hostId, ip, instanceId, ct);
     public Task<string> Logs(string hostId, string ip, string instanceId, CancellationToken ct) => docker.Logs(hostId, ip, instanceId, ct);
     public Task<string> Command(string hostId, string ip, Instance instance, string command, CancellationToken ct) => docker.Command(hostId, ip, instance, command, ct);
+    public Task<Dictionary<string,string>> DownloadedConfigs(string hostId,string ip,CancellationToken ct)=>docker.DownloadedConfigs(hostId,ip,ct);
     public Task<string> Config(string hostId, string ip, string instanceId, SquadHostManager.Core.ConfigRequest request, CancellationToken ct) => docker.Config(hostId, ip, instanceId, request, ct);
     public Task<Stream> ArchiveStream(string hostId,string ip,string instanceId,CancellationToken ct) => docker.ArchiveStream(hostId,ip,instanceId,ct);
     public Task<Stream> BackupArchiveStream(string hostId,string ip,string instanceId,CancellationToken ct)=>docker.BackupArchiveStream(hostId,ip,instanceId,ct);

@@ -40,6 +40,8 @@ public sealed class Instance
     public Dictionary<string,LogPosition> LogPositions {get;set;}=[];
     public string? RestoreBackupId {get;set;}
     public List<DateTimeOffset> RecoveryAttempts { get; set; }=[];
+    public Dictionary<string,string>? CommonConfigs {get;set;}
+    public string? ServerConfig {get;set;}
     public Dictionary<string,string>? TemplateConfigs { get; set; }
     public bool RecoveryNeeded {get;set;}
     public string? LastArchiveId {get;set;}
@@ -84,6 +86,7 @@ public record LogPosition(long Offset,long Inode);
 public record LogBatch(string Text,Dictionary<string,LogPosition> Positions);
 public interface IInfrastructure
 {
+    Task<Dictionary<string,string>> DownloadedConfigs(string hostId,string ip,CancellationToken ct)=>Task.FromResult(new Dictionary<string,string>());
     Task<BalanceView> Balance(CancellationToken ct)=>Task.FromResult(new BalanceView(null,"EUR",null,null,true));
     async Task<LogBatch> MatchLogs(string hostId,string ip,Instance instance,CancellationToken ct)=>new(await Logs(hostId,ip,instance.Id,ct),instance.LogPositions);
     Task<MetricSample> Metrics(string hostId,string ip,Instance instance,CancellationToken ct)=>Task.FromResult(new MetricSample(DateTimeOffset.UtcNow,null,null,null,null,null,null,null,"unavailable"));

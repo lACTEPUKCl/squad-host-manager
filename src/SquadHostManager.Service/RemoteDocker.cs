@@ -1,3 +1,4 @@
+using SquadHostManager.Core;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -263,7 +264,8 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
     {
         if(instance.CpuSet==null || !Regex.IsMatch(instance.CpuSet,@"^\d+,\d+$"))throw new ArgumentException("Invalid CPU pair.");
         var name = Container(instance.Id); var dir = Root + "/instances/" + instance.Id;
-        var cfg = $"ServerName={instance.Name}\nServerPassword={instance.Password}\nMaxPlayers={instance.MaxPlayers}\nShouldAdvertise=true\nIsLANMatch=false\nMapRotationMode=LayerList\nRecordDemos=false\n";
+        var cfg = SquadConfig.Identity(instance.ServerConfig??SquadConfig.Initial,instance.Name,instance.Password,instance.MaxPlayers);
+        var commonWrites=string.Join("\n",(instance.CommonConfigs??new()).Where(p=>p.Key!="Server.cfg" && ConfigFiles.Contains(p.Key)).Select(p=>"printf %s "+Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(p.Value)))+" | base64 -d > \"$dir/config/"+p.Key+"\""));
         var rcon = $"Port={instance.Ports.Rcon}\nPassword={instance.RconPassword}\n";
         var body = $$"""
             set -euo pipefail
@@ -277,6 +279,7 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
             done
             dir={{Quote(dir)}}
             mkdir -p "$dir/data/SquadGame/ServerConfig" "$dir/config"
+            {{commonWrites}}
             printf %s {{Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(cfg)))}} | base64 -d > "$dir/config/Server.cfg"
             printf %s {{Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(rcon)))}} | base64 -d > "$dir/config/Rcon.cfg"
             selected_layer={{Quote(instance.StartLayer)}}
@@ -402,7 +405,13 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
         }
         finally { gate.Release(); }
     }
-    public static readonly string[] ConfigFiles = ["Admins.cfg", "Bans.cfg", "LayerRotation.cfg", "LevelRotation.cfg", "ExcludedFactions.cfg", "ExcludedLayers.cfg", "ExcludedLevels.cfg", "LayerVoting.cfg", "LayerVotingLowPlayers.cfg", "LayerVotingNight.cfg", "VoteConfig.cfg", "MOTD.cfg", "ServerMessages.cfg", "RemoteAdminListHosts.cfg", "RemoteBanListHosts.cfg", "CustomOptions.cfg", "License.cfg"];
+    public static readonly string[] ConfigFiles = ["Server.cfg", "Admins.cfg", "Bans.cfg", "LayerRotation.cfg", "LevelRotation.cfg", "ExcludedFactions.cfg", "ExcludedLayers.cfg", "ExcludedLevels.cfg", "LayerVoting.cfg", "LayerVotingLowPlayers.cfg", "LayerVotingNight.cfg", "VoteConfig.cfg", "MOTD.cfg", "ServerMessages.cfg", "RemoteAdminListHosts.cfg", "RemoteBanListHosts.cfg", "CustomOptions.cfg", "ModsConfig.cfg", "License.cfg"];
+    public Task<Dictionary<string,string>> DownloadedConfigs(string hostId,string ip,CancellationToken ct)=>With(hostId,ip,ssh=>
+    {
+        var script="import pathlib,json\np=pathlib.Path('/opt/squad-host-manager/cache/game/SquadGame/ServerConfig')\nfiles="+System.Text.Json.JsonSerializer.Serialize(ConfigFiles)+"\nresult={}\nfor name in files:\n f=p/name\n if f.is_file() and not f.is_symlink():\n  data=f.read_bytes()\n  if len(data)<=80000:\n   text=data.decode('utf-8-sig')\n   if len(text)<=20000 and '\\0' not in text:result[name]=text\nprint(json.dumps(result))\n";
+        var output=Run(ssh,"printf %s "+Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(script)))+" | base64 -d | python3 -");
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string,string>>(output)??new();
+    },ct);
     public Task<string> Config(string hostId, string ip, string instanceId, SquadHostManager.Core.ConfigRequest request, CancellationToken ct)
     {
         _ = Container(instanceId);

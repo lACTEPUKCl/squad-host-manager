@@ -53,4 +53,4 @@ public record RentHostRequest(Guid RequestId, string Region, decimal HourlyPrice
 public record HostStageEvent(DateTimeOffset At, string Stage);
 public record HostStartupView(string Stage, DateTimeOffset StartedAt, DateTimeOffset UpdatedAt, string? ProviderState, List<HostStageEvent> Events, string? Error = null, double? DownloadPercent = null);
 
-public record ServerDefaults(string Mods="",string? Admins=null);
+public record ServerDefaults(string Mods="",string? Admins=null,Dictionary<string,string>? Configs=null);

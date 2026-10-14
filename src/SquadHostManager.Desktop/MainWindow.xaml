@@ -153,7 +153,7 @@
                                 <PasswordBox x:Name="ServerPassword" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
                                 <TextBlock Text="{DynamicResource passwordHint}" FontSize="12" TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,8" />
                                 <Label Content="{DynamicResource playersLimit}" Target="{Binding ElementName=MaxPlayers}" Padding="0" />
-                                <TextBox x:Name="MaxPlayers" Text="100" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
+                                <TextBox x:Name="MaxPlayers" IsReadOnly="True" ToolTip="{DynamicResource cfgCommonScope}" Text="100" Padding="9,6" Margin="0,5,0,14" MinHeight="34" />
 
 
 
@@ -174,7 +174,7 @@
                         </StackPanel></ScrollViewer></Border>
                         <WrapPanel Grid.Row="2" Grid.ColumnSpan="3" Margin="0,20,0,0">
                             <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" Content="{DynamicResource start}" Click="StartClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
-                            <Button x:Name="SaveSettingsButton" Content="{DynamicResource saveSettings}" Click="SaveSettingsClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" />
+                            <Button Content="{DynamicResource config}" Click="ConfigClick" Margin="0,0,8,8"/><Button x:Name="SaveSettingsButton" Content="{DynamicResource saveSettings}" Click="SaveSettingsClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" />
                             <Button x:Name="StopButton" Content="{DynamicResource stop}" Click="StopClick" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
                             <Button x:Name="ReleaseButton" Content="{DynamicResource release}" Click="ReleaseClick" Visibility="Collapsed" IsEnabled="False" Padding="14,7" Margin="0,0,8,8" MinHeight="34" />
                         </WrapPanel>
@@ -223,8 +223,8 @@
                         <TextBlock Text="{DynamicResource modsApplyHelp}" TextWrapping="Wrap" />
                     </StackPanel></ScrollViewer></Grid>
                 </TabItem>
-                <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource gameAdmins}" Tag="M10 3 A4 4 0 1 1 10 11 A4 4 0 1 1 10 3 M3 18 Q3 13 10 13 Q17 13 17 18"><Grid><ScrollViewer VerticalScrollBarVisibility="Auto"><ScrollViewer.Style><Style TargetType="ScrollViewer"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></ScrollViewer.Style><StackPanel x:Name="AdminEditorPanel" IsEnabled="False" Margin="20">
-                        <TextBlock Text="{DynamicResource adminsHelp}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <TabItem x:Name="LegacyAdminsTab" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource gameAdmins}" Tag="M10 3 A4 4 0 1 1 10 11 A4 4 0 1 1 10 3 M3 18 Q3 13 10 13 Q17 13 17 18"><Grid><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="AdminEditorPanel" IsEnabled="False" Margin="20">
+                        <TextBlock Text="{DynamicResource preRentalConfigHelp}" TextWrapping="Wrap" Margin="0,0,0,12"/><TextBlock Text="{DynamicResource adminsHelp}" TextWrapping="Wrap" Margin="0,0,0,12" />
                         <WrapPanel><Button Content="{DynamicResource save}" Click="SaveAdminsClick" Padding="14,7" Margin="0,0,12,12" /></WrapPanel>
                         <Grid Height="190"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <DataGrid x:Name="AdminGroups" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="AdminGroupSelected"><DataGrid.Columns><DataGridTextColumn Header="{DynamicResource adminGroup}" Binding="{Binding Name}" Width="120" /><DataGridTextColumn Header="{DynamicResource permissions}" Binding="{Binding Permissions}" Width="*" /></DataGrid.Columns></DataGrid>
@@ -235,7 +235,7 @@
                         <WrapPanel x:Name="PermissionFlags" Margin="0,12"/><TextBlock Text="{DynamicResource adminAddHelp}" TextWrapping="Wrap" Margin="0,14,0,8" />
                         <WrapPanel><TextBox x:Name="AdminSteamId" Width="190" Padding="9,6" ToolTip="Steam ID" /><ComboBox x:Name="AdminGroup" Width="170" Margin="12,0" Padding="9,6" ToolTip="{DynamicResource adminGroup}" /><Button Content="{DynamicResource addAdmin}" Click="AddAdminClick" Padding="14,7" Margin="0,0,12,0" /><Button Content="{DynamicResource removeAdmin}" Click="RemoveAdminClick" Padding="14,7" /></WrapPanel>
                         <Expander Header="{DynamicResource advanced}" Margin="0,16,0,0"><TextBox x:Name="AdminsEditor" Height="220" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="12" TextChanged="AdminsTextChanged" /></Expander>
-                    </StackPanel></ScrollViewer><local:EmptyServerView/></Grid></TabItem>
+                    </StackPanel></ScrollViewer></Grid></TabItem>
                 <TabItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource files}" Tag="M5 3 H12 L16 7 V17 H5 Z M12 3 V7 H16"><Grid><Grid Margin="24"><Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding NoServerHelpVisibility,RelativeSource={RelativeSource AncestorType=Window}}" Value="Visible"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <TextBlock Text="{DynamicResource filesHelp}" TextWrapping="Wrap" Margin="0,0,0,14" />
                         <WrapPanel Grid.Row="1"><ComboBox x:Name="FileCategory" SelectedIndex="0" SelectionChanged="FileCategoryChanged" Width="190" Margin="0,0,12,12"><ComboBoxItem Content="{DynamicResource allFiles}"/><ComboBoxItem Content="{DynamicResource logs}"/><ComboBoxItem Content="{DynamicResource scoreboards}"/></ComboBox><Button x:Name="ConfigButton" Content="{DynamicResource config}" Click="ConfigClick" Padding="14,7" Margin="0,0,12,12"/><Button x:Name="FilesRefreshButton" Content="{DynamicResource refresh}" Click="FilesRefreshClick" Padding="14,7" Margin="0,0,12,12" /><Button x:Name="DownloadFileButton" Content="{DynamicResource downloadFile}" Click="DownloadFileClick" Padding="14,7" Margin="0,0,12,12" /><Button x:Name="ArchiveButton" Content="{DynamicResource archive}" Click="ArchiveClick" Padding="14,7" Margin="0,0,12,12" /></WrapPanel>
@@ -332,6 +332,7 @@
                     </Grid>
                 </TabItem>
                 <TabItem x:Name="FeaturesTab" Header="{DynamicResource automation}" Tag="M10 6 A4 4 0 1 1 10 14 A4 4 0 1 1 10 6 M10 2 V4 M10 16 V18 M2 10 H4 M16 10 H18 M4 4 L6 6 M14 14 L16 16 M4 16 L6 14 M14 6 L16 4"><ContentControl x:Name="FeatureHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
+                <TabItem x:Name="ConfigurationTab" Header="{DynamicResource cfgTab}" Tag="M4 3 H16 V17 H4 Z M7 7 H13 M7 10 H13 M7 13 H11"><ContentControl x:Name="ConfigurationHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
             </TabControl>
             </DockPanel>
             <Border Grid.Column="1" CornerRadius="0" Padding="24,28"><Border.Background><SolidColorBrush Color="Transparent"/></Border.Background>

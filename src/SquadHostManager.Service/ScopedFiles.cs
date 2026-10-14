@@ -49,7 +49,7 @@ public static class ScopedFiles
                 finally:os.close(directory)
             print(total);sys.exit(0)
         if op in ['read','write']:
-            allowed=['Admins.cfg','Bans.cfg','LayerRotation.cfg','LevelRotation.cfg','ExcludedFactions.cfg','ExcludedLayers.cfg','ExcludedLevels.cfg','LayerVoting.cfg','LayerVotingLowPlayers.cfg','LayerVotingNight.cfg','VoteConfig.cfg','MOTD.cfg','ServerMessages.cfg','RemoteAdminListHosts.cfg','RemoteBanListHosts.cfg','CustomOptions.cfg','License.cfg']
+            allowed=['Server.cfg','Admins.cfg','Bans.cfg','LayerRotation.cfg','LevelRotation.cfg','ExcludedFactions.cfg','ExcludedLayers.cfg','ExcludedLevels.cfg','LayerVoting.cfg','LayerVotingLowPlayers.cfg','LayerVotingNight.cfg','VoteConfig.cfg','MOTD.cfg','ServerMessages.cfg','RemoteAdminListHosts.cfg','RemoteBanListHosts.cfg','CustomOptions.cfg','ModsConfig.cfg','License.cfg']
             assert name in allowed
             config=os.open(base+'/config',os.O_PATH|os.O_DIRECTORY|os.O_NOFOLLOW)
             if op=='read':
