@@ -22,6 +22,7 @@ public sealed partial class ConfigEditor : UserControl
     private readonly TextBox raw=new(){AcceptsReturn=true,AcceptsTab=true,MinHeight=280,FontFamily=new("Consolas"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto};
     private readonly StackPanel form=new();
     private readonly TextBlock searchLabel;
+    private readonly TextBlock scope;
     private readonly TextBox search=new(){Margin=new(0,0,0,18)};
     private readonly TextBlock title=new(){FontSize=23,FontWeight=FontWeights.SemiBold},help=new(){TextWrapping=TextWrapping.Wrap,Margin=new(0,8,0,18)},status=new(){TextWrapping=TextWrapping.Wrap,Margin=new(0,12,0,0)};
     private readonly DispatcherTimer timer=new(){Interval=TimeSpan.FromMilliseconds(650)};
@@ -39,7 +40,7 @@ public sealed partial class ConfigEditor : UserControl
         var scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Auto};scroll.SetResourceReference(StyleProperty,"NavigationScroller");Grid.SetColumn(scroll,2);grid.Children.Add(scroll);
         var panel=new StackPanel{MaxWidth=880,HorizontalAlignment=HorizontalAlignment.Stretch};scroll.Content=panel;
         panel.Children.Add(title);panel.Children.Add(help);
-        var scope=Text(defaults?"cfgCommonScope":"cfgServerScope");scope.Margin=new(0,0,0,18);panel.Children.Add(scope);
+        scope=Text(defaults?"cfgCommonScope":"cfgServerScope");scope.Margin=new(0,0,0,18);panel.Children.Add(scope);
         var actions=new WrapPanel();panel.Children.Add(actions);
         Button Action(string key,RoutedEventHandler handler){var b=new Button{Margin=new(0,0,8,12)};b.SetResourceReference(ContentControl.ContentProperty,key);b.Click+=handler;actions.Children.Add(b);return b;}
         Action("importConfig",(_,_)=>Import());Action("exportConfig",(_,_)=>Export());Action("cfgSync",async(_,_)=>await Flush());Action("cfgReset",async(_,_)=>await ResetConfig());Action("cfgRollback",async(_,_)=>await RollbackConfig());
@@ -61,6 +62,7 @@ public sealed partial class ConfigEditor : UserControl
     }
     public void RestrictToAdmins()
     {
+        scope.SetResourceReference(TextBlock.TextProperty,"cfgAdminsScope");
         navigation.ItemsSource=new[]{new FileChoice("Admins.cfg")};navigation.Visibility=Visibility.Collapsed;
         var grid=(Grid)Content;grid.ColumnDefinitions[0].Width=new GridLength(0);grid.ColumnDefinitions[1].Width=new GridLength(0);
     }

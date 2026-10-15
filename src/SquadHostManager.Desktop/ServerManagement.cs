@@ -22,7 +22,7 @@ public partial class MainWindow
         if (OwnServers.ItemsSource is not List<InstanceView> previous || !previous.Select(i => (i.Id,i.Name)).SequenceEqual(owned.Select(i => (i.Id,i.Name)))) OwnServers.ItemsSource = owned;
         OwnServers.SelectedValue = selectedId;
         selecting = false;
-        var show = !draft && Tabs.SelectedItem != SharedHostTab && Tabs.SelectedItem != ConfigurationTab && owned.Count > 0;
+        var show = !draft && Tabs.SelectedItem != SharedHostTab && Tabs.SelectedItem != ConfigurationTab && Tabs.SelectedItem != LegacyAdminsTab && owned.Count > 0;
         OwnServerLabel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         OwnServers.Visibility = show && owned.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         OwnSingleName.Visibility = show && owned.Count == 1 ? Visibility.Visible : Visibility.Collapsed;

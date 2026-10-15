@@ -21,6 +21,7 @@ jobs:
           dotnet publish src/SquadHostManager.Service -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -o artifacts/coordinator-linux-arm64
       - run: dotnet test tests/SquadHostManager.Tests -c Release
       - run: dotnet build src/SquadHostManager.Desktop -c Release
+      - run: dotnet run --project tests/SquadHostManager.DesktopChecks -c Release
       - run: dotnet build tools/ReleaseSigner -c Release
   linux:
     runs-on: ubuntu-latest
