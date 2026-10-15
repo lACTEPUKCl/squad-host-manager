@@ -26,6 +26,7 @@ public sealed class FakeInfrastructure : IInfrastructure
     public Task<BalanceView> Balance(CancellationToken ct){BalanceReads++;if(BalanceFails)throw new IOException();return Task.FromResult(BalanceValue);}
     public TaskCompletionSource? PrepareEntered, PrepareBlock;
     public bool FailPrepare;
+    public string PrepareError="Preparation failed";
     public List<RentalLocation> RentalLocations { get; } = [];
     public Task<List<RentalLocation>> Locations(CancellationToken ct) => Task.FromResult(RentalLocations.ToList());
     public int Rents, Deletes, Starts, Stops;
@@ -59,11 +60,11 @@ public sealed class FakeInfrastructure : IInfrastructure
         if (FailRentAfterCreating) throw new IOException("Lost response"); return Task.FromResult(Host);
     }
     public Task<RemoteHost?> GetHost(string id, CancellationToken ct) => Task.FromResult(Host);
-    public Task Prepare(string id, string ip, CancellationToken ct) => Task.CompletedTask;
+    public Task Prepare(string id, string ip, CancellationToken ct) {if(FailPrepare)throw new IOException(PrepareError);return Task.CompletedTask;}
     public Task Prepare(string id, string ip, Action<string> progress, CancellationToken ct)
     {
         progress("sshConnecting");progress("sshConnected");progress("dockerPreparing");progress("imageDownloading");PrepareEntered?.TrySetResult();
-        if(FailPrepare)throw new IOException("Preparation failed");return PrepareBlock?.Task??Task.CompletedTask;
+        if(FailPrepare)throw new IOException(PrepareError);return PrepareBlock?.Task??Task.CompletedTask;
     }
     public Task<List<RemoteInstance>> Inventory(string id, string ip, CancellationToken ct)
     { if (FailInventory) throw new IOException("SSH unavailable"); return Task.FromResult(Containers.ToList()); }

@@ -61,10 +61,26 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
         rm -f /shm-cache/ready
         mkdir -p /shm-cache/game
         completed=false
+        repaired=false
+        validation=()
         for attempt in 1 2 3; do
-          if "$STEAMCMDDIR/steamcmd.sh" +force_install_dir /shm-cache/game +login anonymous +app_info_update 1 +app_update "$STEAMAPPID" +quit; then completed=true;break;fi
+          content_log="$HOME/Steam/logs/content_log.txt"
+          if [ -f "$content_log" ]; then cp "$content_log" /shm-cache/steam-content.previous.log; : > "$content_log"; fi
+          if "$STEAMCMDDIR/steamcmd.sh" +force_install_dir /shm-cache/game +login anonymous +app_info_update 1 +app_info_print "$STEAMAPPID" +app_update "$STEAMAPPID" "${validation[@]}" +quit; then completed=true;break;fi
           echo "Steam download failed; attempt $attempt of 3" >&2
-          sleep 10
+          if [ -f "$content_log" ]; then
+            cp "$content_log" /shm-cache/steam-last-failure.log
+            grep -E 'Failed|Access Denied|update canceled' "$content_log" | tail -n 8 >&2 || true
+            manifest=/shm-cache/game/steamapps/appmanifest_403240.acf
+            if ! $repaired && [ -s /shm-cache/game/SquadGameServer.sh ] && [ -s "$manifest" ] && grep -q 'Failed to get manifest request code.*Access Denied' "$content_log"; then
+              mkdir -p /shm-cache/metadata-backups
+              mv "$manifest" "/shm-cache/metadata-backups/appmanifest_403240.$(date -u +%Y%m%dT%H%M%SZ).acf"
+              echo 'Retrying with fresh install metadata; game files and server configs are preserved.' >&2
+              repaired=true
+              validation=(validate)
+            fi
+          fi
+          if [ "$attempt" -lt 3 ]; then sleep 10; fi
         done
         $completed
         test -s /shm-cache/game/SquadGameServer.sh
@@ -195,11 +211,11 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
                     progress?.Invoke("gameCacheDownloading");
                     Run(ssh, $$"""
                     set -euo pipefail
-                    mkdir -p {{Root}}/cache
+                    mkdir -p {{Root}}/cache/steam-state
                     touch {{Root}}/cache/cache.lock
-                    chown 1000:1000 {{Root}}/cache {{Root}}/cache/cache.lock
+                    chown 1000:1000 {{Root}}/cache {{Root}}/cache/cache.lock {{Root}}/cache/steam-state
                     printf %s {{Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(CacheScript.ReplaceLineEndings("\n"))))}} | base64 -d > {{Root}}/cache-download.sh
-                    docker run --rm --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --entrypoint /bin/bash -v {{Root}}/cache:/shm-cache -v {{Root}}/cache-download.sh:/shm-cache-download.sh:ro {{Image}} /shm-cache-download.sh > {{Root}}/cache-download.log 2>&1 || { tail -c 1500 {{Root}}/cache-download.log >&2; exit 1; }
+                    docker run --rm --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --entrypoint /bin/bash -v {{Root}}/cache:/shm-cache -v {{Root}}/cache/steam-state:/home/steam/Steam -v {{Root}}/cache-download.sh:/shm-cache-download.sh:ro {{Image}} /shm-cache-download.sh > {{Root}}/cache-download.log 2>&1 || { tail -c 1500 {{Root}}/cache-download.log >&2; exit 1; }
                     """, TimeSpan.FromMinutes(60));
                     return true;
                 }, ct); return;

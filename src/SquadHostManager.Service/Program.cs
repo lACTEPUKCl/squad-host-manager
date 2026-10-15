@@ -82,6 +82,7 @@ var api = app.MapGroup("/api").RequireAuthorization().RequireRateLimiting("user"
 static User Current(HttpContext c) => new(c.User.FindFirstValue(ClaimTypes.NameIdentifier)!, c.User.Identity!.Name!, c.User.IsInRole("admin"));
 api.MapPost("/logout", (HttpContext c) => { accounts.Logout(c.Request.Headers.Authorization.ToString()[7..]); return Results.NoContent(); });
 api.MapGet("/pool", async (HttpContext c, PoolCoordinator pool) => { if (c.Request.Query["refresh"] == "true") { try { await pool.Reconcile(c.RequestAborted); } catch (Exception) when (!c.RequestAborted.IsCancellationRequested) { } } return pool.Snapshot(Current(c)); });
+api.MapPost("/admin/retry-installations",(HttpContext c,PoolCoordinator pool)=>pool.RetryFailedInstallations(Current(c)));
 api.MapPost("/rent", async (RentHostRequest r, PoolCoordinator pool,HttpContext c) => Results.Accepted(value:await pool.RentHost(Current(c),r,c.RequestAborted)));
 api.MapGet("/locations", (RentalCatalog catalog, HttpContext c) => catalog.Read(c.RequestAborted));
 api.MapGet("/location", (Store store,IConfiguration config) => new RentalLocationRequest(store.Load<string>("rental-region")??config["Cherry:Region"]??"DE-Frankfurt"));
