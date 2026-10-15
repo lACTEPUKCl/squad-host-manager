@@ -223,7 +223,7 @@
                         <TextBlock Text="{DynamicResource modsApplyHelp}" TextWrapping="Wrap" />
                     </StackPanel></ScrollViewer></Grid>
                 </TabItem>
-                <TabItem x:Name="LegacyAdminsTab" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource gameAdmins}" Tag="M10 3 A4 4 0 1 1 10 11 A4 4 0 1 1 10 3 M3 18 Q3 13 10 13 Q17 13 17 18"><Grid><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="AdminEditorPanel" IsEnabled="False" Margin="20">
+                <TabItem x:Name="LegacyAdminsTab" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Header="{DynamicResource gameAdmins}" Tag="M10 3 A4 4 0 1 1 10 11 A4 4 0 1 1 10 3 M3 18 Q3 13 10 13 Q17 13 17 18"><Grid><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="AdminEditorPanel" IsEnabled="False" Margin="20">
                         <TextBlock Text="{DynamicResource preRentalConfigHelp}" TextWrapping="Wrap" Margin="0,0,0,12"/><TextBlock Text="{DynamicResource adminsHelp}" TextWrapping="Wrap" Margin="0,0,0,12" />
                         <WrapPanel><Button Content="{DynamicResource save}" Click="SaveAdminsClick" Padding="14,7" Margin="0,0,12,12" /></WrapPanel>
                         <Grid Height="190"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

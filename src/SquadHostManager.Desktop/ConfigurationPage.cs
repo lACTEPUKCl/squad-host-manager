@@ -9,12 +9,14 @@ public partial class MainWindow
 {
     private ConfigEditor? configurationEditor;
     private string? configurationContext;
+    private bool configurationForAdmins;
     private string ConfigurationContext => BaseUri()+"|"+session?.UserId;
-    private async void BuildConfigurationPage()
+    private async void BuildConfigurationPage(bool admins=false)
     {
         if(http==null || session==null)return;
         if(configurationEditor!=null)await configurationEditor.Flush();
         ConfigEditor.MigrateLegacyDrafts(ConfigurationContext,pool?.Instances.Where(i=>i.IsMine).Select(i=>i.Id)??[]);
+        ConfigurationHost.Content=null;
         var panel=new DockPanel{Margin=new(24)};
         var client=http;
         configurationEditor=new ConfigEditor(ConfigurationContext+"|defaults",async request=>
@@ -27,7 +29,8 @@ public partial class MainWindow
             if(file=="Server.cfg" && Mine==null){MaxPlayers.Text=SquadConfig.Get(text,"MaxPlayers")??MaxPlayers.Text;SaveServerDraft();}
             if(file=="Admins.cfg"){AdminsEditor.Text=text;adminsOriginal=text;adminsLoadedId=AdminTarget;AdminEditorPanel.IsEnabled=true;}
         };
-        panel.Children.Add(configurationEditor);ConfigurationHost.Content=panel;configurationContext=ConfigurationContext;
+        if(admins)configurationEditor.RestrictToAdmins();
+        panel.Children.Add(configurationEditor);if(admins)LegacyAdminsTab.Content=panel;else ConfigurationHost.Content=panel;configurationContext=ConfigurationContext;configurationForAdmins=admins;
     }
     private void OpenConfiguration()
     {

@@ -59,6 +59,11 @@ public sealed partial class ConfigEditor : UserControl
         };
         Loaded+=(_,_)=>{retryTimer.Start();if(navigation.SelectedIndex<0)navigation.SelectedIndex=0;};
     }
+    public void RestrictToAdmins()
+    {
+        navigation.ItemsSource=new[]{new FileChoice("Admins.cfg")};navigation.Visibility=Visibility.Collapsed;
+        var grid=(Grid)Content;grid.ColumnDefinitions[0].Width=new GridLength(0);grid.ColumnDefinitions[1].Width=new GridLength(0);
+    }
     private static TextBlock Text(string key){var t=new TextBlock{TextWrapping=TextWrapping.Wrap};t.SetResourceReference(TextBlock.TextProperty,key);return t;}
     private string PathName=>Path.Combine(storage,file+".dat");
     private void Write(Draft draft)
