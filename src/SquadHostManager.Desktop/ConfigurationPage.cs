@@ -20,7 +20,7 @@ public partial class MainWindow
         configurationEditor=new ConfigEditor(ConfigurationContext+"|defaults",async request=>
         {
             using var response=await client.PostAsJsonAsync("api/server-defaults/config",request);await Check(response);
-            return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("output").GetString()??"";
+            var result=await response.Content.ReadFromJsonAsync<JsonElement>();if(request.Content!=null && result.TryGetProperty("failed",out var failed) && failed.GetArrayLength()>0)throw new ConfigApplyException(string.Join(", ",failed.EnumerateArray().Select(i=>i.GetString())));return result.GetProperty("output").GetString()??"";
         },true,async file=>{using var response=await client.GetAsync("api/server-defaults/versions?file="+Uri.EscapeDataString(file));await Check(response);return (await response.Content.ReadFromJsonAsync<List<ConfigRevision>>())??[];},async file=>{using var response=await client.GetAsync("api/server-defaults/stock?file="+Uri.EscapeDataString(file));await Check(response);return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("output").GetString()??"";});
         configurationEditor.Saved+=(file,text)=>
         {

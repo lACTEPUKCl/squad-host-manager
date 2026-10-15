@@ -40,6 +40,7 @@ public sealed class Instance
     public Dictionary<string,LogPosition> LogPositions {get;set;}=[];
     public string? RestoreBackupId {get;set;}
     public List<DateTimeOffset> RecoveryAttempts { get; set; }=[];
+    public bool PendingAdminsReload {get;set;}
     public Dictionary<string,string>? CommonConfigs {get;set;}
     public string? ServerConfig {get;set;}
     public Dictionary<string,string>? TemplateConfigs { get; set; }

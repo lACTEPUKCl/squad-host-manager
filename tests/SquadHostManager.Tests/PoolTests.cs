@@ -34,6 +34,8 @@ public sealed class FakeInfrastructure : IInfrastructure
     public List<string>? CpuLayout;
     public Task<List<string>> CpuSets(string id,string ip,CancellationToken ct)=>Task.FromResult(CpuLayout??Enumerable.Range(0,16).Select(i=>$"{i},{i+16}").ToList());
     public List<string> Commands=[];
+    public List<(string Instance,string Command)> InstanceCommands=[];
+    public HashSet<string> FailCommandsFor=[];
     public GameStatus? GameStatus;
     public MetricSample Metric=new(DateTimeOffset.UtcNow,12,1048576,12884901888,1024,1000000,2,"AlBasrah_AAS_v1");
     public Task<MetricSample> Metrics(string id,string ip,Instance instance,CancellationToken ct)=>Task.FromResult(Metric);
@@ -75,7 +77,7 @@ public sealed class FakeInfrastructure : IInfrastructure
     public Task Stop(string id, string ip, string instance, CancellationToken ct) { ArchiveOrder.Add("stop");Stops++; Containers.RemoveAll(c => c.Id == instance); return Task.CompletedTask; }
     public Task Delete(string id, CancellationToken ct) { Deletes++; Host = null; return Task.CompletedTask; }
     public Task<string> Logs(string id, string ip, string instance, CancellationToken ct) => Task.FromResult(LogText);
-    public Task<string> Command(string id, string ip, Instance inst, string command, CancellationToken ct) {Commands.Add(command);return Task.FromResult("response");}
+    public Task<string> Command(string id, string ip, Instance inst, string command, CancellationToken ct) {Commands.Add(command);InstanceCommands.Add((inst.Id,command));if(FailCommandsFor.Contains(inst.Id))throw new IOException("RCON unavailable");return Task.FromResult("response");}
     public Dictionary<(string,string),string> Configurations=[];
     public Task<string> Config(string id,string ip,string inst,ConfigRequest r,CancellationToken ct)
     {if(r.Content==null)return Task.FromResult(Configurations.GetValueOrDefault((inst,r.File),"config"));Configurations[(inst,r.File)]=r.Content;return Task.FromResult("saved");}

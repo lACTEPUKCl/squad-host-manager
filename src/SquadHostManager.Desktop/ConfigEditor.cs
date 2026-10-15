@@ -101,6 +101,7 @@ public sealed partial class ConfigEditor : UserControl
             if(name==file && raw.Text==content){Write(new(content,false));status.Text=Localization.T("cfgSaved");}
             Saved?.Invoke(name,content);
         }
+        catch(ConfigApplyException e){status.Text=Localization.T("cfgApplyFailed",e.Message);}
         catch(ArgumentException){status.Text=Localization.T("cfgInvalid");}
         catch{status.Text=Localization.T("cfgOffline");}
         finally{saving.Release();}

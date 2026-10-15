@@ -43,6 +43,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
             store.Save("server-defaults-"+user.Id,prior with{Configs=configs,Admins=request.File=="Admins.cfg"?content:prior.Admins});
             foreach(var instance in state.Instances.Where(i=>i.OwnerId==user.Id))
             {
+                if(request.File=="Admins.cfg" && instance.Phase=="running")instance.PendingAdminsReload=true;
                 if(request.File=="Server.cfg"){instance.ServerConfig=content;if(int.TryParse(SquadConfig.Get(content,"MaxPlayers"),out var players))instance.MaxPlayers=players;}
             }
             Save();return content;
@@ -542,6 +543,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
                 catch (Exception) when (!ct.IsCancellationRequested) { status = new("gameUnavailable"); }
                 if (status != null) lock (gate) { inst.GameState = status.State; inst.DownloadPercent = status.DownloadPercent;inst.ProgressKey=status.ProgressKey;if(status.State=="gameFailed"){if(!inst.RecoveryNeeded)Notify(inst.OwnerId,"noticeCrashed",inst.Id,inst.Name);inst.RecoveryNeeded=true;}if(status.State=="gameReady"){inst.RecoveryNeeded=false;inst.Phase="running";inst.Error=null;if(!inst.ReadyNotified){Notify(inst.OwnerId,"noticeReady",inst.Id,inst.Name);inst.ReadyNotified=true;}} }
             }
+            foreach(var inst in running.Where(i=>i.PendingAdminsReload && i.Phase=="running" && i.GameState=="gameReady"))await ApplyLiveAdmins(inst,ct);
             lock (gate)
             {
                 foreach (var inst in state.Instances.Where(i => i.Phase == "running"))
@@ -602,6 +604,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
                 {
                     var reply=await infra.Command(state.HostId!,state.Ip!,inst,"AdminReloadServerConfig",ct);
                     if(reply.TrimStart().StartsWith("ERROR",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException(reply);
+                    if(request.File=="Admins.cfg")lock(gate){inst.PendingAdminsReload=false;Save();}
                     return "Конфиг сохранён. AdminReloadServerConfig выполнен.\n"+reply;
                 }
                 finally{commandLock.Release();}

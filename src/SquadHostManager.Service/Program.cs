@@ -118,7 +118,7 @@ api.MapGet("/balance",async(HttpContext c,AccountBalance balance)=>{Current(c);r
 api.MapGet("/server-defaults",(HttpContext c,PoolCoordinator pool)=>pool.Defaults(Current(c)));
 api.MapGet("/server-defaults/versions",(string file,HttpContext c,PoolCoordinator pool)=>pool.CommonConfigHistory(Current(c),file));
 api.MapGet("/server-defaults/stock",(string file,HttpContext c,PoolCoordinator pool)=>new{output=pool.StandardConfig(Current(c),file)});
-api.MapPost("/server-defaults/config",(HttpContext c,PoolCoordinator pool,ConfigRequest request)=>new{output=pool.DefaultConfig(Current(c),request)});
+api.MapPost("/server-defaults/config",async(HttpContext c,PoolCoordinator pool,ConfigRequest request)=>await pool.SaveCommonConfig(Current(c),request,c.RequestAborted));
 api.MapGet("/server-tools",(string? instanceId,HttpContext c,PoolCoordinator pool)=>pool.Tools(Current(c),instanceId));
 api.MapPost("/admin/prepare",(RestartRequest r,HttpContext c,PoolCoordinator pool)=>Results.Accepted(value:pool.RetryHostPreparation(Current(c),r)));
 api.MapGet("/matches/{id}/archive",(string id,HttpContext c,PoolCoordinator pool)=>Results.File(pool.DownloadMatchArchive(Current(c),id),"application/gzip","squad-logs.tar.gz"));
