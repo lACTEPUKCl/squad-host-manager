@@ -38,5 +38,5 @@ mock.DelayWrites=0;mock.FailWrites=true;Field<TextBox>("raw").Text+="\nGroup=Off
 tabs.SelectedItem=window.FindName("ConfigurationTab");await Task.Delay(250);Field<ListBox>("navigation").SelectedIndex=1;await Task.Delay(250);
 Assert(Field<TextBox>("raw").Text.Contains("Offline"),"Offline draft lost on tab change");mock.FailWrites=false;mock.FailReload=true;await Editor().Flush();Assert(Field<TextBlock>("status").Text.Contains("Test server"),"Failed reload not shown");mock.FailReload=false;await Editor().Flush();Assert(mock.Admins.Contains("Offline"),"Offline draft not retried");
 tabs.SelectedItem=admins;await Task.Delay(250);Assert(Field<TextBox>("raw").Text.Contains("Offline"),"Retried draft missing from admins");
-Console.WriteLine("PASS: rapid switching, offline drafts and RCON failure recovery;  visible admins tab, shared save, config switch, return without data loss");app.Shutdown();}catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;app.Shutdown();}};app.Run();}}
+Console.WriteLine("PASS: rapid switching, offline drafts and RCON failure recovery;  visible admins tab, shared save, config switch, return without data loss");await RconChecks.Run(window);app.Shutdown();}catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;app.Shutdown();}};app.Run();}}
 

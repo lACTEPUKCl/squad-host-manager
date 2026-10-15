@@ -223,7 +223,8 @@ public partial class MainWindow : Window
     }
     private async Task Stop(bool release) { await Post<OperationView>("api/stop", new StopRequest(Guid.NewGuid(), release, release && pool?.CanRelease == true ? null : RequiredMine().Id)); await Refresh(); }
     private bool Confirm(string message, string title) => AppDialog.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
-    private async Task Rcon(string command) { var mine = RequiredMine(); var result = await Post<JsonElement>($"api/instances/{mine.Id}/rcon", new CommandRequest(command)); if (Mine?.Id == mine.Id) { Output.Text = result.GetProperty("output").GetString(); ConsoleViews.SelectedIndex = 1; } }
+    private static void EnsureRconReply(string reply){if(RconCommands.Rejected(reply))throw new InputException(reply);}
+    private async Task Rcon(string command) { try{RconCommands.Validate(command);}catch(ArgumentException){throw new InputException(L("rconInvalidParameters"));}var mine = RequiredMine(); var result = await Post<JsonElement>($"api/instances/{mine.Id}/rcon", new CommandRequest(command));var reply=result.GetProperty("output").GetString()??""; if (Mine?.Id == mine.Id) { Output.Text = reply.Length==0?L("rconNoConfirmation"):reply; ConsoleViews.SelectedIndex = 1; Status.Text=reply.Length==0?L("rconNoConfirmation"):reply.Split('\n')[0]; } EnsureRconReply(reply); }
     private static void Open(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     private bool PersonalHosting => Uri.TryCreate(Endpoint.Text,UriKind.Absolute,out var address) && address.IsLoopback;
     private void OwnerLoginExpanded(object sender,RoutedEventArgs e){InvitationEntry.Visibility=Visibility.Collapsed;LoginFeedback.Text="";ErrorPanel.Visibility=Visibility.Collapsed;}

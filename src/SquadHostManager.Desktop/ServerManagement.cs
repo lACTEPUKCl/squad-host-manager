@@ -33,7 +33,7 @@ public partial class MainWindow
     private void ClearInstanceViews()
     {
         Output.Text = LogOutput.Text = L("consoleEmpty"); FollowLogs.IsChecked = false; Command.Clear();
-        RenderPlayers([]); files = []; filesLoadedId = playersLoadedId = layersLoadedId = commandsLoadedId = null; CurrentLayer.Text = UpcomingLayer.Text = ""; LayerInput.ItemsSource = null; CommandCatalog.ItemsSource = null; PlayerCount.Text = ""; FileList.ItemsSource = null; AdminsEditor.Clear(); adminsLoadedId = null; adminsOriginal = null; AdminEditorPanel.IsEnabled = false; ClearGroupInputs(); AdminSteamId.Clear(); estimates.Clear();
+        RenderPlayers([]); files = []; filesLoadedId = playersLoadedId = layersLoadedId = commandsLoadedId = null; CurrentLayer.Text = UpcomingLayer.Text = ""; LayerInput.ItemsSource = null; CommandCatalog.ItemsSource = null; PlayerCount.Text = ""; PlayerActionResult.Text = ""; FileList.ItemsSource = null; AdminsEditor.Clear(); adminsLoadedId = null; adminsOriginal = null; AdminEditorPanel.IsEnabled = false; ClearGroupInputs(); AdminSteamId.Clear(); estimates.Clear();
         InstallTiming.Text = ""; InstallProgress.Visibility = Visibility.Collapsed;
     }
     private bool HasPendingChanges()
@@ -191,13 +191,22 @@ public partial class MainWindow
         var id = RequiredMine().Id;
         if (playersLoadedId != id || SelectedPlayer() is not SquadPlayer player) throw new InputException(L("selectPlayer"));
         var action = (string)((Button)sender).Tag; var reason = PlayerReason.Text.Trim(); var duration = BanDuration.Text.Trim();
-        if (action != "AdminForceTeamChangeById" && (reason.Length == 0 || reason.Any(char.IsControl))) throw new InputException(L("reason"));
-        if (action == "AdminBanById" && !Regex.IsMatch(duration, @"^(0|[1-9]\d{0,5}[hdwMy]?)$")) throw new InputException(L("banDuration"));
+        if (!Regex.IsMatch(player.SteamId,@"^\d{17}$"))throw new InputException(L("rconSteamIdMissing"));
+        if (action != "AdminForceTeamChange" && (reason.Length == 0 || reason.Any(char.IsControl))) throw new InputException(L("reason"));
+        if (action == "AdminBan" && !RconCommands.ValidBanDuration(duration)) throw new InputException(L("banDuration"));
+        string command;try{command=RconCommands.PlayerAction(action,player.SteamId,reason,duration);}catch(ArgumentException){throw new InputException(L("rconInvalidParameters"));}
         if (!Confirm(L("playerActionConfirm", ((Button)sender).Content, player.Name), L("players"))) return;
-        var current = await Post<System.Text.Json.JsonElement>($"api/instances/{id}/rcon", new CommandRequest("ListPlayers"));
-        if (!SquadPlayers.Parse(current.GetProperty("output").GetString() ?? "").Contains(player)) throw new InputException(L("playerChanged"));
-        var command = action + " " + player.Id + (action == "AdminForceTeamChangeById" ? "" : action == "AdminBanById" ? " " + duration + " " + reason : " " + reason);
-        await Post<System.Text.Json.JsonElement>($"api/instances/{id}/rcon", new CommandRequest(command)); await RefreshPlayers();
+        if(Mine?.Id!=id)throw new InputException(L("playerChanged"));
+        PlayerActionResult.Text=L("rconSending");
+        try
+        {
+            var result=await Post<System.Text.Json.JsonElement>($"api/instances/{id}/rcon",new CommandRequest(command));
+            if(Mine?.Id!=id)return;
+            var reply=result.GetProperty("output").GetString()??"";
+            PlayerActionResult.Text=reply.Length==0?L("rconNoConfirmation"):reply;
+            EnsureRconReply(reply);await RefreshPlayers();
+        }
+        catch{if(PlayerActionResult.Text==L("rconSending"))PlayerActionResult.Text=L("actionFailed");throw;}
     });
     private async void BroadcastClick(object sender, RoutedEventArgs e) => await Safe(async () =>
     {
@@ -207,7 +216,7 @@ public partial class MainWindow
     private async void SetLayerClick(object sender, RoutedEventArgs e) => await Safe(async () =>
     {
         var layer = LayerInput.Text.Trim(); if (!Regex.IsMatch(layer, @"^[A-Za-z0-9_]+(?: [A-Za-z0-9_]+){0,4}$")) throw new InputException(L("layerHelp"));
-        if (Confirm(L("layerConfirm", layer), L("nextLayer"))) { await Rcon("AdminSetNextLayer " + layer); await RefreshLayers(); Status.Text = L("layerQueued"); }
+        if (Confirm(L("layerConfirm", layer), L("nextLayer"))) { await Rcon("AdminSetNextLayer " + layer); await RefreshLayers(); }
     });
 
     private sealed record AdminGroupRow(string Name, string Permissions);
