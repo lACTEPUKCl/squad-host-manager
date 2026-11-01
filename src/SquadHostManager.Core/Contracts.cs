@@ -21,7 +21,7 @@ public record RestartRequest(Guid RequestId);
 public record InviteRequest(int Uses = 1);
 public record HostView(string? Id, string? Ip, string Phase, string? Error, string? RentedByName = null, string? ConnectedByName = null, RentalRecord? Rental = null, bool Verified = false, HostStartupView? Startup = null);
 public record InstanceView(string Id, string OwnerId, string OwnerName, string Name, int Slot,
-    PortSet Ports, string Phase, bool IsMine, string? Error, string? GameState = null, double? DownloadPercent = null, int MaxPlayers = 100, string Mods = "", DateTimeOffset? StartedAt = null, int? QueuePosition = null, string? Password = null, string StartLayer = "", string? ProgressKey = null);
+    PortSet Ports, string Phase, bool IsMine, string? Error, string? GameState = null, double? DownloadPercent = null, int MaxPlayers = 100, string Mods = "", DateTimeOffset? StartedAt = null, int? QueuePosition = null, string? Password = null, string StartLayer = "", string? ProgressKey = null,string? Address=null);
 public record PoolView(HostView Host, List<InstanceView> Instances, bool CanRelease, bool Busy, string? LastEvent, bool CanStart = true, bool ReleaseEnabled = true, List<RentalRecord>? RentalHistory = null, int CpuCapacity = 16,int? OccupiedServers=null,int? OtherActiveServers=null,int? OtherStoppingServers=null,bool CanRent=false);
 public record ConfigRequest(string File, string? Content = null);
 public record ServerFile(string Path, long Bytes);

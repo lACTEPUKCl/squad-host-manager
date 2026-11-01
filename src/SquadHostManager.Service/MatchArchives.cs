@@ -46,6 +46,29 @@ public sealed partial class PoolCoordinator
         {throw new IOException("Не удалось сохранить логи. Сервер и аренда не отключены. Повторите отключение: "+e.Message,e);}
         finally{if(File.Exists(temporary))File.Delete(temporary);}
     }
+    private Stream? ArchivedInstanceStream(User user,string id)
+    {
+        lock(gate)
+        {
+            var instance=state.Instances.Find(i=>i.Id==id);
+            if(instance!=null)
+            {
+                if(instance.OwnerId!=user.Id)throw new UnauthorizedAccessException("Можно скачать только свои файлы.");
+                if(instance.Phase!="stopped")return null;
+            }
+            var archive=instance?.LastArchiveId ?? state.Matches
+                .Where(m=>m.OwnerId==user.Id && m.Value.InstanceId==id && m.Value.ArchiveId!=null)
+                .OrderByDescending(m=>m.Value.At).Select(m=>m.Value.ArchiveId).FirstOrDefault();
+            if(archive==null)
+            {
+                if(instance==null)throw new UnauthorizedAccessException("Архив недоступен.");
+                throw new InvalidOperationException("Сохранённый архив сервера недоступен.");
+            }
+            var path=MatchArchivePath(archive);
+            if(!File.Exists(path))throw new InvalidOperationException("Сохранённый архив сервера удалён.");
+            return new FileStream(path,FileMode.Open,System.IO.FileAccess.Read,FileShare.Read|FileShare.Delete);
+        }
+    }
     public Stream DownloadMatchArchive(User user,string id)
     {
         lock(gate)

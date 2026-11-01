@@ -24,8 +24,11 @@ builder.Services.AddSingleton(new Store(dataDir));
 builder.Services.AddSingleton<Accounts>();
 builder.Services.AddSingleton<AccountBalance>();
 builder.Services.AddSingleton<RentalCatalog>();
-builder.Services.AddSingleton<IInfrastructure, CherryInfrastructure>();
+builder.Services.AddSingleton<CherryInfrastructure>();
+builder.Services.AddSingleton<RespawnInfrastructure>();
+builder.Services.AddSingleton<IInfrastructure,HostingInfrastructure>();
 builder.Services.AddSingleton<PoolCoordinator>();
+builder.Services.AddSingleton<RespawnHost>();
 builder.Services.AddHostedService<PoolWorker>();
 builder.Services.AddHostedService<AutomationWorker>();
 builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 8192);
@@ -81,6 +84,20 @@ app.MapPost("/api/key-login", (KeyLoginRequest r) => accounts.KeyLogin(r)).Requi
 var api = app.MapGroup("/api").RequireAuthorization().RequireRateLimiting("user");
 static User Current(HttpContext c) => new(c.User.FindFirstValue(ClaimTypes.NameIdentifier)!, c.User.Identity!.Name!, c.User.IsInRole("admin"));
 api.MapPost("/logout", (HttpContext c) => { accounts.Logout(c.Request.Headers.Authorization.ToString()[7..]); return Results.NoContent(); });
+api.MapGet("/hosting-provider",async(PoolCoordinator pool,RespawnHost respawn,HttpContext c)=>
+{
+    var view=pool.Provider();
+    if(view.Selected=="respawn" && view.CanSwitch)
+    {
+        try{if(await respawn.HasServers(c.RequestAborted))view=view with{CanSwitch=false};}
+        catch(Exception) when(!c.RequestAborted.IsCancellationRequested){view=view with{CanSwitch=false};}
+    }
+    return view;
+});
+api.MapPost("/hosting-provider",(HostingProviderRequest r,HttpContext c,PoolCoordinator pool,RespawnHost respawn)=>pool.SwitchProvider(Current(c),r.Provider,()=>respawn.HasServers(c.RequestAborted),c.RequestAborted));
+api.MapGet("/respawn",async(HttpContext c,RespawnHost respawn)=>new RespawnView(respawn.Configured,await respawn.Plans(c.RequestAborted),[],respawn.Pending));
+api.MapPost("/respawn/token",(RespawnTokenRequest r,HttpContext c,PoolCoordinator pool,RespawnHost respawn)=>pool.OnRespawn(Current(c),async()=>{await respawn.SaveToken(r.Token,c.RequestAborted);return new{saved=true};},c.RequestAborted));
+api.MapPost("/respawn/rent",(RespawnRentRequest r,HttpContext c,PoolCoordinator pool,RespawnHost respawn)=>pool.StartRespawn(Current(c),r,respawn,c.RequestAborted));
 api.MapGet("/pool", async (HttpContext c, PoolCoordinator pool) => { if (c.Request.Query["refresh"] == "true") { try { await pool.Reconcile(c.RequestAborted); } catch (Exception) when (!c.RequestAborted.IsCancellationRequested) { } } return pool.Snapshot(Current(c)); });
 api.MapPost("/admin/retry-installations",(HttpContext c,PoolCoordinator pool)=>pool.RetryFailedInstallations(Current(c)));
 api.MapPost("/rent", async (RentHostRequest r, PoolCoordinator pool,HttpContext c) => Results.Accepted(value:await pool.RentHost(Current(c),r,c.RequestAborted)));

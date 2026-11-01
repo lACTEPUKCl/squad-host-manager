@@ -153,10 +153,19 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
     private static string Run(SshClient ssh, string script, TimeSpan? timeout = null)
     {
         script = script.ReplaceLineEndings("\n");
-        // Commands are base64 transported; user data never becomes shell syntax.
-        using var command = ssh.CreateCommand("printf %s " + Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(script))) + " | base64 -d | bash");
+        // Stream the payload over channel data: an SSH exec request has a fixed packet limit.
+        // Stage the complete script privately so child processes cannot consume its input.
+        using var command = ssh.CreateCommand("script=$(mktemp) || exit; trap 'rm -f \"$script\"' EXIT; base64 -d >\"$script\" && bash \"$script\"");
         command.CommandTimeout = timeout ?? TimeSpan.FromMinutes(5);
-        var output = command.Execute();
+        var execution = command.ExecuteAsync(CancellationToken.None);
+        using (var input = command.CreateInputStream())
+        {
+            var payload = Encoding.ASCII.GetBytes(Convert.ToBase64String(Encoding.UTF8.GetBytes(script)));
+            for (var offset = 0; offset < payload.Length; offset += 16384)
+                input.Write(payload, offset, Math.Min(16384, payload.Length - offset));
+        }
+        execution.GetAwaiter().GetResult();
+        var output = command.Result;
         if(command.ExitStatus!=0)
         {
             var detail=(command.Error+"\n"+output).Trim();
@@ -215,6 +224,7 @@ public sealed partial class RemoteDocker(IConfiguration config, Store store, Fun
                     touch {{Root}}/cache/cache.lock
                     chown 1000:1000 {{Root}}/cache {{Root}}/cache/cache.lock {{Root}}/cache/steam-state
                     printf %s {{Quote(Convert.ToBase64String(Encoding.UTF8.GetBytes(CacheScript.ReplaceLineEndings("\n"))))}} | base64 -d > {{Root}}/cache-download.sh
+                    chmod 644 {{Root}}/cache-download.sh
                     docker run --rm --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --entrypoint /bin/bash -v {{Root}}/cache:/shm-cache -v {{Root}}/cache/steam-state:/home/steam/Steam -v {{Root}}/cache-download.sh:/shm-cache-download.sh:ro {{Image}} /shm-cache-download.sh > {{Root}}/cache-download.log 2>&1 || { tail -c 1500 {{Root}}/cache-download.log >&2; exit 1; }
                     """, TimeSpan.FromMinutes(60));
                     return true;

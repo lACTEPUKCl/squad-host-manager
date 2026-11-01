@@ -52,6 +52,8 @@ public partial class MainWindow
         draftFile=ServerDraftFile.FileName(BaseUri().ToString(),session!.UserId);restoringDraft=true;
         try
         {
+            // A saved new-server form must not replace the active server on login.
+            if(pool?.Instances.Any(i=>i.IsMine && i.Phase!="stopped")==true)return;
             var saved=ServerDraftFile.Read(draftFile);if(saved==null)return;
             draft=true;selectedId=null;displayedInstance=null;ClearInstanceViews();
             ServerName.Text=saved.Name;ServerPassword.Password=saved.Password;MaxPlayers.Text=saved.MaxPlayers;Mods.Text=saved.Mods;

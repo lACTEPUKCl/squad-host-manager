@@ -124,6 +124,12 @@ public partial class MainWindow
         loadedBudget=view.Budget;
         if(!budgetLoaded){budgetLoaded=true;budgetAmount.Text=view.Budget.Amount.ToString();budgetCurrency.Text=view.Budget.Currency;budgetAmount.ToolTip=view.Budget.Currency;noticeSound.IsChecked=view.Budget.Sound;}
         OverviewSpent.Text=view.HostSpent is {} hostSpent?hostSpent.ToString("0.00")+" "+view.ForecastCurrency:"—";
+        if(hostingProvider?.Selected=="respawn")
+        {
+            respawnHourlyLabel=view.HourlyForecast is {} managedRate?managedRate.ToString("0.0000")+" "+view.ForecastCurrency:"—";
+            respawnSpentLabel=view.HostSpent is {} managedSpent?"≈ "+managedSpent.ToString("0.00")+" "+view.ForecastCurrency:"—";
+            OverviewHourly.Text=respawnHourlyLabel;OverviewSpent.Text=respawnSpentLabel;
+        }
         string Money(Func<CostUserRow,decimal> amount)=>view.Costs.Count==0?"—":string.Join("\n",view.Costs.GroupBy(c=>c.Currency).Select(g=>g.Sum(amount).ToString("F2")+" "+g.Key));
         spentValue.Text=Money(c=>c.Spent);savedValue.Text=Money(c=>c.Saved);rateValue.Text=view.HourlyForecast is {} rate?rate.ToString("F3")+" "+view.ForecastCurrency+" / "+L("hourShort"):"—";
         featureCosts.Text=L(view.Costs.Count==0?"statisticsEmpty":"personalCostsNote")+(view.HistoryIncomplete?"\n"+L("statisticsIncomplete"):"");

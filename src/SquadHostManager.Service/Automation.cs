@@ -21,12 +21,21 @@ public sealed partial class PoolCoordinator
         lock(gate)
         {
             if(id!=null)Owned(user,id);
-            var report=CostAccounting.Calculate(state.Rentals,state.CostEvents,DateTimeOffset.UtcNow);
+            var rentals=state.Rentals.Where(r=>r.Id.StartsWith("respawn-meter:",StringComparison.Ordinal)==(state.Provider=="respawn")).ToList();
+            var report=CostAccounting.Calculate(rentals,state.CostEvents,DateTimeOffset.UtcNow);
             var costs=report.Users.Where(r=>r.UserId==user.Id).ToList();
             var active=state.CostEvents.LastOrDefault(e=>e.HostId==state.HostId)?.Users;
             var rate=state.Rentals.LastOrDefault(r=>r.Id==state.HostId)?.HourlyRate;
             var hostCosts=CostAccounting.Calculate(state.Rentals.Where(r=>r.Id==state.HostId).ToList(),state.CostEvents.Where(e=>e.HostId==state.HostId).ToList(),DateTimeOffset.UtcNow);
-            return new(state.Templates.Where(t=>t.OwnerId==user.Id).Select(t=>t.Value).ToList(),state.Notices.Where(n=>n.OwnerId==user.Id).Select(n=>n.Value).Reverse().ToList(),state.Budgets.GetValueOrDefault(user.Id)??new(),costs,active?.Any(u=>u.Id==user.Id)==true && active.Count>0 && rate!=null?rate/active.Count:null,state.Rentals.LastOrDefault(r=>r.Id==state.HostId)?.Currency,report.HistoryIncomplete,state.HostId==null?null:hostCosts.Users.Where(r=>r.UserId==user.Id).Sum(r=>r.Spent));
+            var forecast=active?.Any(u=>u.Id==user.Id)==true && active.Count>0 && rate!=null?rate/active.Count:null;
+            var currency=state.Rentals.LastOrDefault(r=>r.Id==state.HostId)?.Currency;
+            decimal? spent=state.HostId==null?null:hostCosts.Users.Where(r=>r.UserId==user.Id).Sum(r=>r.Spent);
+            if(state.Provider=="respawn")
+            {
+                forecast=state.Instances.Where(i=>(user.IsAdmin || i.OwnerId==user.Id) && i.Phase=="running").Sum(i=>store.Load<RespawnManagedServer>("respawn-instance-"+i.Id)?.Plan.HourlyPrice??0);
+                currency="EUR";spent=(user.IsAdmin?report.Users:costs).Where(c=>c.Currency=="EUR").Sum(c=>c.Spent);
+            }
+            return new(state.Templates.Where(t=>t.OwnerId==user.Id).Select(t=>t.Value).ToList(),state.Notices.Where(n=>n.OwnerId==user.Id).Select(n=>n.Value).Reverse().ToList(),state.Budgets.GetValueOrDefault(user.Id)??new(),costs,forecast,currency,report.HistoryIncomplete,spent);
         }
     }
     public async Task<TemplateView> SaveTemplate(User user,TemplateRequest request,CancellationToken ct)
@@ -84,7 +93,7 @@ public sealed partial class PoolCoordinator
                 if(state.HostPhase!="ready" || state.HostId==null || state.Operations.Any(o=>o.InstanceId==inst.Id && o.Phase is "queued" or "running"))continue;
                 if(inst.RecoveryAttempts.LastOrDefault() is {} last && last!=default && now<last.AddMinutes(Math.Min(5,Math.Pow(2,Math.Min(3,inst.RecoveryAttempts.Count-1)))))continue;
                 if(inst.RecoveryAttempts.Count>=6)inst.RecoveryAttempts.RemoveAt(0);
-                try{new Accounts(store).EnsureAccess(inst.OwnerId);inst.RecoveryAttempts.Add(now);Restart(new(inst.OwnerId,inst.OwnerName,false),inst.Id,new(Guid.NewGuid()));Notify(inst.OwnerId,"noticeRecovering",inst.Id,inst.Name);Save();}catch(InvalidOperationException){}
+                try{new Accounts(store).EnsureAccess(inst.OwnerId);inst.RecoveryAttempts.Add(now);var restart=Restart(new(inst.OwnerId,inst.OwnerName,false),inst.Id,new(Guid.NewGuid()));state.Operations.Single(o=>o.Id==restart.Id).UpdateGame=false;Notify(inst.OwnerId,"noticeRecovering",inst.Id,inst.Name);Save();}catch(InvalidOperationException){}
                 catch(UnauthorizedAccessException){}
             }
             var report=CostAccounting.Calculate(state.Rentals,state.CostEvents,now);

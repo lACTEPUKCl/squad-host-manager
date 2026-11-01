@@ -15,6 +15,7 @@ public static class CostAccounting
         var history=events.Where(e=>e.At<=now).OrderBy(e=>e.At).ToList(); var hours=new List<CostHour>(); var incomplete=false;
         foreach(var rental in rentals)
         {
+            if(rental.EstimateIncomplete)incomplete=true;
             if(rental.StartedAt is not {} start || rental.Currency is not {} currency) { incomplete=true; continue; }
             var end=rental.EndedAt??now; var changes=history.Where(e=>e.HostId==rental.Id).ToList();
             if(changes.Count==0 || changes[0].At>start.AddSeconds(30)) incomplete=true;
@@ -26,7 +27,8 @@ public static class CostAccounting
                 var users=(current?.Users??[]).Concat(changes.Where(e=>e.At>at && e.At<until).SelectMany(e=>e.Users)).DistinctBy(u=>u.Id).OrderBy(u=>u.Id).ToList();
                 var rate=rental.Rates.LastOrDefault(r=>r.At<=at)?.Rate??rental.HourlyRate;
                 if(rate==null || users.Count==0) { incomplete=true; continue; }
-                hours.Add(new(at,rental.Id,currency,rate.Value,users));
+                var charge=rental.BillingUnit=="seconds"?rate.Value*(until-at).Ticks/TimeSpan.TicksPerHour:rate.Value;
+                hours.Add(new(at,rental.Id,currency,charge,users));
             }
         }
         var totals=new Dictionary<(string,string),(string Name,decimal Spent,decimal Separate)>();

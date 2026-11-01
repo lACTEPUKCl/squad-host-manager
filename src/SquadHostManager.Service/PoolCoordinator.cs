@@ -7,7 +7,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
 {
     private readonly object gate = new();
     private readonly SemaphoreSlim worker = new(1, 1);
-    private readonly PoolState state = LoadState(store);
+    private PoolState state = LoadState(store);
     private static PoolState LoadState(Store store)
     {
         var state=store.Load<PoolState>("pool")??new();
@@ -56,6 +56,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         if(!user.IsAdmin)throw new UnauthorizedAccessException("Только владелец хостинга.");
         lock(gate)
         {
+            RequireCherry();
             if(Existing(user,request.RequestId) is {} old)return View(old);
             if(state.HostId==null || state.HostPhase=="deleting" || state.Operations.Any(o=>o.Phase is "queued" or "running"))throw new InvalidOperationException("Хост недоступен или операция ещё выполняется.");
             var op=new Operation{Id=request.RequestId.ToString("N"),UserId=user.Id,Kind="prepare",ExpectedHostId=state.HostId};
@@ -65,12 +66,13 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     public async Task<OperationView> RentHost(User user, RentHostRequest request, CancellationToken ct)
     {
         new Accounts(store).EnsureRentalAccess(user.Id);
-        lock(gate) { if(Existing(user,request.RequestId) is {} old)return View(old); if(rentalDisabled)throw new InvalidOperationException("Новая аренда отключена владельцем."); }
+        lock(gate) { RequireCherry(); if(Existing(user,request.RequestId) is {} old)return View(old); if(rentalDisabled)throw new InvalidOperationException("Новая аренда отключена владельцем."); }
         var offer=(await infra.Locations(ct)).Find(r=>r.Slug==request.Region);
         if(offer==null || offer.Available<1 || offer.HourlyPrice!=request.HourlyPrice || offer.Currency!=request.Currency || offer.PrebuiltId!=request.PrebuiltId)throw new InvalidOperationException("Цена или наличие изменились. Обновите список городов.");
         lock(gate)
         {
             if(Existing(user,request.RequestId) is {} old)return View(old);
+            RequireCherry();
             if(state.HostId!=null || state.HostPhase!="empty" || state.Operations.Any(o=>o.Phase is "queued" or "running"))throw new InvalidOperationException("Хост уже существует или аренда выполняется.");
             new Accounts(store).EnsureRentalAccess(user.Id);
             store.Save("rental-region",request.Region);store.Save("rental-quote-"+state.Marker,request);
@@ -81,11 +83,13 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     }
     public async Task SetRegion(User user,string region,CancellationToken ct)
     {
+        lock(gate)RequireCherry();
         new Accounts(store).EnsureRentalAccess(user.Id);
         var locations=await infra.Locations(ct);
         if(!locations.Any(r=>r.Slug==region))throw new ArgumentException("Выберите европейский город из списка Cherry Servers.");
         lock(gate)
         {
+            RequireCherry();
             if(state.HostId!=null || state.Operations.Any(o=>o.Phase is "queued" or "running"))throw new InvalidOperationException("Город нельзя менять при существующей аренде или заказе.");
             store.Save("rental-region",region);
         }
@@ -99,6 +103,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         {
             lock (gate)
             {
+                RequireCherry();
                 if (state.HostId != null || state.Instances.Any(Occupied) || state.Operations.Any(o => o.Phase is "queued" or "running")) throw new InvalidOperationException("Подключение доступно только для пустого пула без операций.");
             }
             var host = await infra.GetHost(hostId, ct) ?? throw new InvalidOperationException("Cherry не видит этот хост.");
@@ -112,9 +117,11 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     public async Task Recover(User user, bool confirmedNoOrder, CancellationToken ct)
     {
         if (!user.IsAdmin) throw new UnauthorizedAccessException("Только владелец пула выполняет сверку.");
+        lock(gate)RequireCherry();
         await worker.WaitAsync(ct);
         try
         {
+            lock(gate)RequireCherry();
             if (state.HostPhase is "ordering" or "order-uncertain")
             {
                 var found = await infra.FindHost(state.Marker, ct);
@@ -179,7 +186,8 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     private void Save() { if (state.HostId == null && state.HostPhase == "empty") { state.RentedByName = null; state.ConnectedByName = null; } RecordParticipants(); store.Save("pool", state); Changed?.Invoke(); }
     private void RecordParticipants()
     {
-        if(state.HostId==null)return;
+        RefreshManagedCosts();
+        if(state.Provider=="respawn" || state.HostId==null)return;
         var users=state.Instances.Where(Occupied).Select(i=>new CostParticipant(i.OwnerId,i.OwnerName)).DistinctBy(u=>u.Id).OrderBy(u=>u.Id).ToList();
         var previous=state.CostEvents.LastOrDefault(e=>e.HostId==state.HostId);
         if(users.Count==0)
@@ -204,10 +212,10 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
             var error=user.IsAdmin?state.HostError:(state.HostPhase=="unavailable"?"Хост недоступен":null);
             var startup=state.Startup is {} current?current with{Events=current.Events.ToList(),Error=user.IsAdmin?current.Error:null}:null;
             var host=new HostView(state.HostId,state.Ip,state.HostPhase,error,state.RentedByName,state.ConnectedByName,rental,state.HostCheckedAt is {} checkedAt && DateTimeOffset.UtcNow-checkedAt<TimeSpan.FromSeconds(60) && state.HostReachable,startup);
-            var instances=state.Instances.Where(i=>user.IsAdmin || i.OwnerId==user.Id).Select(i=>new InstanceView(i.Id,i.OwnerId,i.OwnerName,i.Name,i.Slot,i.Ports,i.Phase,i.OwnerId==user.Id,i.Error,i.GameState,i.DownloadPercent,i.MaxPlayers,i.Mods,i.StartedAt,QueuePosition(i.Id),i.OwnerId==user.Id?i.Password:null,i.StartLayer,i.ProgressKey)).ToList();
-            var pending=state.Operations.Any(o=>o.Phase is "queued" or "running");
-            var canRent=!rentalDisabled && new Accounts(store).CanRent(user.Id);
-            return new(host,instances,!releaseDisabled && state.HostPhase=="ready" && !state.Instances.Any(Occupied) && state.LastStoppedBy==user.Id && !pending,pending,user.IsAdmin?state.LastEvent:null,!(rentalDisabled && state.HostId==null) && state.HostPhase is not ("deleting" or "order-uncertain" or "unavailable"),!releaseDisabled,user.IsAdmin?state.Rentals.Select(r=>r.Copy()).ToList():[],state.CpuCapacity,state.Instances.Count(Occupied),state.Instances.Count(i=>i.OwnerId!=user.Id && i.Phase is not ("stopped" or "stopping")),state.Instances.Count(i=>i.OwnerId!=user.Id && i.Phase=="stopping"),canRent);
+            var instances=state.Instances.Where(i=>user.IsAdmin || i.OwnerId==user.Id).Select(i=>new InstanceView(i.Id,i.OwnerId,i.OwnerName,i.Name,i.Slot,i.Ports,i.Phase,i.OwnerId==user.Id,i.Error,i.GameState,i.DownloadPercent,i.MaxPlayers,i.Mods,i.StartedAt,QueuePosition(i.Id),i.OwnerId==user.Id?i.Password:null,i.StartLayer,i.ProgressKey,i.Address)).ToList();
+            var pending=providerChanging || state.Operations.Any(o=>o.Phase is "queued" or "running");
+            var canRent=!providerChanging && (state.Provider=="respawn" || !rentalDisabled) && new Accounts(store).CanRent(user.Id);
+            return new(host,instances,!releaseDisabled && state.HostPhase=="ready" && !state.Instances.Any(Occupied) && state.LastStoppedBy==user.Id && !pending,pending,user.IsAdmin?state.LastEvent:null,!providerChanging && !(state.Provider=="cherry" && rentalDisabled && state.HostId==null) && state.HostPhase is not ("deleting" or "order-uncertain" or "unavailable"),!releaseDisabled,user.IsAdmin?state.Rentals.Select(r=>r.Copy()).ToList():[],state.CpuCapacity,state.Instances.Count(Occupied),state.Instances.Count(i=>i.OwnerId!=user.Id && i.Phase is not ("stopped" or "stopping")),state.Instances.Count(i=>i.OwnerId!=user.Id && i.Phase=="stopping"),canRent);
         }
     }
     private int? QueuePosition(string instanceId)
@@ -229,8 +237,9 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         lock (gate)
         {
             var existing = Existing(user, request.RequestId); if (existing != null) return View(existing);
+            RequireStartProvider(user);
             if(state.HostId==null)new Accounts(store).EnsureRentalAccess(user.Id);
-            if (rentalDisabled && state.HostId == null) throw new InvalidOperationException("Владелец запретил новую аренду. Сначала подключите существующий хост.");
+            if (state.Provider=="cherry" && rentalDisabled && state.HostId == null) throw new InvalidOperationException("Владелец запретил новую аренду. Сначала подключите существующий хост.");
             if (state.HostPhase is "deleting" or "order-uncertain" or "unavailable") throw new InvalidOperationException("Хост закрывается или результат аренды требует проверки.");
             ValidateSettings(request.Name, request.Password, request.Mods, request.MaxPlayers);
             if(request.StartLayer!=null && !ValidStartLayer(request.StartLayer))throw new ArgumentException("Неверное название стартового слоя.");
@@ -437,6 +446,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         lock (gate)
         {
             var existing = Existing(user, request.RequestId); if (existing != null) return View(existing);
+            RequireStartProvider(user);
             var inst = state.Instances.Find(i => i.Id == id && i.OwnerId == user.Id) ?? throw new UnauthorizedAccessException("Можно перезапустить только свой сервер.");
             if (inst.Phase is not ("running" or "error") || state.HostPhase != "ready" || state.Operations.Any(o => o.InstanceId == id && o.Phase is "queued" or "running")) throw new InvalidOperationException("Дождитесь завершения текущей операции.");
             var op = new Operation { Id = request.RequestId.ToString("N"), UserId = user.Id, InstanceId = id, Kind = "restart", ExpectedHostId=state.HostId };
@@ -447,6 +457,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     {
         Instance inst; lock (gate) inst = state.Instances.Single(i => i.Id == op.InstanceId);
         await infra.Stop(state.HostId!, state.Ip!, inst.Id, ct);
+        if(op.UpdateGame)await infra.Update(state.HostId!,state.Ip!,inst,ct);
         await StartRemote(op, ct);
     }
     private async Task StopRemote(Operation op, CancellationToken ct)
@@ -640,6 +651,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         await worker.WaitAsync(ct);
         try
         {
+            if(ArchivedInstanceStream(user,id) is {} saved)return saved;
             FileAccess(user,id);
             var stream=await infra.ArchiveStream(state.HostId!,state.Ip!,id,ct);lock(gate){Notify(user.Id,"noticeArchive",id,Owned(user,id).Name);Save();}return stream;
         }
@@ -647,12 +659,9 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     }
     public async Task<byte[]> Archive(User user, string id, CancellationToken ct)
     {
-        await worker.WaitAsync(ct);
-        try
-        {
-            lock (gate) if (!state.Instances.Any(i => i.Id == id && i.OwnerId == user.Id && i.Phase is "running" or "stopped" or "error")) throw new UnauthorizedAccessException("Архив доступен только для своего сервера.");
-            return await infra.Archive(state.HostId!, state.Ip!, id, ct);
-        }
-        finally { worker.Release(); }
+        await using var source=await ArchiveStream(user,id,ct);
+        using var target=new MemoryStream();
+        await source.CopyToAsync(target,ct);
+        return target.ToArray();
     }
 }

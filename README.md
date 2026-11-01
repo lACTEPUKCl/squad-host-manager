@@ -1,6 +1,6 @@
 # Squad Server Manager
 
-A Windows app for **hourly Squad server hosting** through Cherry Servers. Rent a host by the hour, install Squad and manage game servers from one interface.
+A Windows app for **hourly Squad server hosting** through Cherry Servers and RespawnHost. Rent hosting, install Squad and manage game servers from one interface. RespawnHost charges by the second while a server runs.
 
 Use your own Cherry account or join shared hosting with an invitation. The hosting owner pays for the host. Each user manages their own game servers.
 
@@ -12,6 +12,7 @@ Use your own Cherry account or join shared hosting with an invitation. The hosti
 - Backups and automatic server/mod log archives before shutdown.
 - Crash recovery and notifications in the app and Discord.
 - Cherry balance and hosting cost tracking.
+- RespawnHost servers in Germany with 8 GB RAM, shared access and separate runtime cost estimates.
 
 Available in English, Russian, German, Spanish, French, Simplified Chinese and Turkish.
 
@@ -51,6 +52,18 @@ Management runs on your computer. No extra VPS is needed in this mode. Keep the 
 
 The VPS stores settings and manages hosting. Squad runs on a separately rented Cherry host. You can remove the management service from the VPS through the app settings.
 
+## Use RespawnHost
+
+The hosting owner configures the coordinator with a RespawnHost API key that has the `servers` scope. Store it in `respawn-token.txt` in the coordinator data directory, readable only by the service account, or set `Respawn__Token` in the service environment. Do not put the key in the desktop app or share it with members.
+
+1. Stop existing game servers, then use the switch button on **Hosting**.
+2. RespawnHost uses one fixed plan: **Germany, 8 GB**. The current price is shown before confirmation.
+3. Rent a server and manage it through the normal configuration, mods, players, console and files pages.
+
+Members use their existing invitations. Requests from different members are queued; each receives a separate server. Restarting a server reuses its existing allocation. Stopping it retains its files without runtime charges. Deleting it in the provider panel removes its data.
+
+Runtime costs are estimates. The owner sees the total for the hosting account; members see their own server costs. RespawnHost balance is not exposed through the supported API-key endpoints. Switching providers does not cancel an existing Cherry rental.
+
 ## Recover owner access
 
 After setup, save your connection file from **Settings → Connection details**. It contains the owner password; keep it private.
@@ -80,4 +93,4 @@ Versions use Git tags vX.Y.Z. Patch notes for all interface languages are in the
 
 Requires Windows and .NET 10 SDK. Run dotnet test tests/SquadHostManager.Tests and dotnet build src/SquadHostManager.Desktop. Publish commands are in .github/workflows/build.yml. Service setup is documented in deploy/DEPLOYMENT.md.
 
-Secrets, settings and archives are excluded from Git. Host capacity depends on workload. Cost tracking does not replace the Cherry invoice.
+Secrets, settings and archives are excluded from Git. Host capacity depends on workload. Cost tracking does not replace the provider's invoice.

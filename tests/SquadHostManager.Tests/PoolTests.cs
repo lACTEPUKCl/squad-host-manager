@@ -31,6 +31,7 @@ public sealed class FakeInfrastructure : IInfrastructure
     public Task<List<RentalLocation>> Locations(CancellationToken ct) => Task.FromResult(RentalLocations.ToList());
     public int Rents, Deletes, Starts, Stops;
     public bool FailRentAfterCreating, FailStartAfterCreating, FailInventory;
+    public TaskCompletionSource? InventoryEntered,InventoryBlock;
     public bool RejectRent;
     public List<string>? CpuLayout;
     public Task<List<string>> CpuSets(string id,string ip,CancellationToken ct)=>Task.FromResult(CpuLayout??Enumerable.Range(0,16).Select(i=>$"{i},{i+16}").ToList());
@@ -66,8 +67,8 @@ public sealed class FakeInfrastructure : IInfrastructure
         progress("sshConnecting");progress("sshConnected");progress("dockerPreparing");progress("imageDownloading");PrepareEntered?.TrySetResult();
         if(FailPrepare)throw new IOException(PrepareError);return PrepareBlock?.Task??Task.CompletedTask;
     }
-    public Task<List<RemoteInstance>> Inventory(string id, string ip, CancellationToken ct)
-    { if (FailInventory) throw new IOException("SSH unavailable"); return Task.FromResult(Containers.ToList()); }
+    public async Task<List<RemoteInstance>> Inventory(string id, string ip, CancellationToken ct)
+    { if (FailInventory) throw new IOException("SSH unavailable");InventoryEntered?.TrySetResult();if(InventoryBlock!=null)await InventoryBlock.Task;return Containers.ToList(); }
     public Task<HashSet<int>> BoundPorts(string id, string ip, CancellationToken ct) => Task.FromResult(ExtraPorts.ToHashSet());
     public Task Start(string id, string ip, Instance inst, CancellationToken ct)
     {

@@ -17,6 +17,11 @@ public partial class MainWindow
     private void RenderSelection()
     {
         var owned = pool!.Instances.Where(i => i.IsMine).ToList();
+        if(draft && Tabs.SelectedItem!=MyServersTab && owned.Any(i=>i.Phase!="stopped"))
+        {
+            SaveServerDraft();draft=false;selectedId=null;displayedInstance=null;
+        }
+        if(selectedId!=null && !owned.Any(i=>i.Id==selectedId))selectedId=null;
         if (!draft && selectedId == null) selectedId = owned.LastOrDefault(i => i.Phase != "stopped")?.Id ?? owned.LastOrDefault()?.Id;
         selecting = true;
         if (OwnServers.ItemsSource is not List<InstanceView> previous || !previous.Select(i => (i.Id,i.Name)).SequenceEqual(owned.Select(i => (i.Id,i.Name)))) OwnServers.ItemsSource = owned;
@@ -54,7 +59,10 @@ public partial class MainWindow
     {
         if (HasPendingChanges() && !Confirm(L("discardChanges"), L("addServer"))) return;
         draft = true; selectedId = null; displayedInstance = null; ClearInstanceViews();
-        ServerName.Text = "My Squad Server"; ServerPassword.Clear(); MaxPlayers.Text = "100"; Mods.Text=defaultMods;
+        ServerDraft? saved=null;
+        try{if(draftFile!=null)saved=ServerDraftFile.Read(draftFile);}
+        catch(Exception error){Status.Text=L("draftRestoreFailed");ErrorDetails.Text=error.Message;ErrorPanel.Visibility=Visibility.Visible;}
+        ServerName.Text = saved?.Name??"My Squad Server"; ServerPassword.Password=saved?.Password??""; MaxPlayers.Text = saved?.MaxPlayers??"100"; Mods.Text=saved?.Mods??defaultMods;
         Tabs.SelectedItem = MyServersTab; RenderPool();
     }
     private async Task LoadLogs()

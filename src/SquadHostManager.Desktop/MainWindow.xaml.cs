@@ -150,7 +150,7 @@ public partial class MainWindow : Window
             using var response = await http.GetAsync("api/pool");
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             { await DisconnectLocal(); throw new InputException(L("sessionExpired")); }
-            await Check(response); pool = (await response.Content.ReadFromJsonAsync<PoolView>())!; RenderPool();
+            await Check(response); pool = (await response.Content.ReadFromJsonAsync<PoolView>())!; RenderPool(); await LoadHostingProviders();RenderHostingProvider();
         }
         catch(RequestException e) when(e.Code==System.Net.HttpStatusCode.TooManyRequests){throw;}
         catch { DisableActions(); HostStatus.Text = L("hostConnectionLost"); throw; }
@@ -200,7 +200,7 @@ public partial class MainWindow : Window
         RestartButton.IsEnabled = mine?.Phase is "running" or "error";
         RestartMatchButton.IsEnabled = EndMatchButton.IsEnabled = CommandButton.IsEnabled;
         MineStatus.Text = mine == null ? L(draft ? "newServer" : pool.Host.Id==null ? pool.Host.Rental?.EndedAt!=null ? "hostCancelled" : "hostNotRented" : "noServers") : mine.Name + "\n" + L(mine.Phase == "queued" && pool.Host.Phase != "ready" ? pool.Host.Phase : mine.Phase == "running" ? mine.GameState ?? "gameStarting" : mine.Phase) + (mine.DownloadPercent is { } percent ? " " + percent.ToString("0.0") + "%" : "");
-        MineAddress.Text = mine == null || pool.Host.Ip == null ? "" : $"{pool.Host.Ip}:{mine.Ports.Game}\nSteam {mine.Ports.Game + 1}   Query {mine.Ports.Query}   RCON {mine.Ports.Rcon}   Beacon {mine.Ports.Beacon}";
+        MineAddress.Text = mine?.Address ?? (hostingProvider?.Selected=="respawn" || mine == null || pool.Host.Ip == null ? "" : $"{pool.Host.Ip}:{mine.Ports.Game}\nSteam {mine.Ports.Game + 1}   Query {mine.Ports.Query}   RCON {mine.Ports.Rcon}   Beacon {mine.Ports.Beacon}");
         RenderConfiguredMods();
         _ = FetchConfiguredModNames();
         RenderTiming(mine);

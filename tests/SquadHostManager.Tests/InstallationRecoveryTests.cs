@@ -4,10 +4,14 @@ namespace SquadHostManager.Tests;
 
 public class InstallationRecoveryTests
 {
-    [Fact] public async Task AdminCanRetryOnlyFailedDownloadsPreservingOwnersAndPorts()
+    [Theory]
+    [InlineData("Steam download failed")]
+    [InlineData("Packet is too big. Maximum packet size is 68536 bytes.")]
+    [InlineData("Ошибка операции на игровом хосте (код 1): /bin/bash: /shm-cache-download.sh: Permission denied")]
+    public async Task AdminCanRetryOnlyFailedDownloadsPreservingOwnersAndPorts(string error)
     {
         using var f=new Fixture();f.Start(3);await f.Drain(1);
-        f.Infra.FailPrepare=true;f.Infra.PrepareError="Steam download failed";
+        f.Infra.FailPrepare=true;f.Infra.PrepareError=error;
         f.Start(0);f.Start(1);f.Start(2);await f.Drain(3);
         var admin=new User("admin","admin",true);var before=f.Pool.Snapshot(admin).Instances.ToDictionary(i=>i.Id,i=>(i.OwnerId,i.Ports));
         Assert.Throws<UnauthorizedAccessException>(()=>f.Pool.RetryFailedInstallations(Fixture.User(0)));

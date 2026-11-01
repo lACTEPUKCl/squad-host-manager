@@ -10,6 +10,7 @@ public partial class MainWindow
     {
         if(http==null || !force && DateTimeOffset.UtcNow-balanceLoaded<TimeSpan.FromSeconds(30))return;
         balanceLoaded=DateTimeOffset.UtcNow;
+        if(hostingProvider?.Selected=="respawn")return;
         try
         {
             using var response=await http.GetAsync("api/balance");await Check(response);

@@ -20,6 +20,23 @@ public class MatchArchiveTests
         archive.Dispose();restored.DeleteMatch(Fixture.User(1),match.Id);
         Assert.Empty(restored.Tools(Fixture.User(1),null).Matches);Assert.Empty(Directory.GetFiles(Path.Combine(f.Store.DirectoryPath,"match-archives")));
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InstanceDownloadUsesSavedArchiveAfterStopOrRentalEnd(bool release)
+    {
+        using var f=new Fixture();f.Infra.ArchiveData=[4,3,2,1];f.Start(1);await f.Drain(1);
+        var id=f.Pool.Snapshot(Fixture.User(1)).Instances.Single().Id;
+        f.Pool.Stop(Fixture.User(1),new(Guid.NewGuid(),release,id));await f.Drain(1);
+        f.Infra.FailArchive=true;
+        var restored=new PoolCoordinator(f.Store,f.Infra);
+        await using var archive=await restored.ArchiveStream(Fixture.User(1),id,default);
+        using var copy=new MemoryStream();await archive.CopyToAsync(copy);
+        Assert.Equal(f.Infra.ArchiveData,copy.ToArray());
+        Assert.Equal(f.Infra.ArchiveData,await restored.Archive(Fixture.User(1),id,default));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(()=>restored.ArchiveStream(Fixture.User(2),id,default));
+        Assert.Equal(new[]{"archive","stop"},f.Infra.ArchiveOrder);
+    }
     [Fact] public async Task FailedArchiveBlocksStopAndRentalDeletionAndCanBeRetried()
     {
         using var f=new Fixture();f.Start(1);await f.Drain(1);var id=f.Pool.Snapshot(Fixture.User(1)).Instances.Single().Id;

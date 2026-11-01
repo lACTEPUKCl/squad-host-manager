@@ -6,6 +6,7 @@ public sealed class RentalRejectedException(string message) : InvalidOperationEx
 
 public sealed class PoolState
 {
+    public string Provider {get;set;}="cherry";
     public List<OwnedBackup> Backups {get;set;}=[];
     public HashSet<string> DeletedMatches {get;set;}=[];
     public List<OwnedMatch> Matches {get;set;}=[];
@@ -56,6 +57,7 @@ public sealed class Instance
     public string OwnerId { get; set; } = "";
     public string OwnerName { get; set; } = "";
     public string Name { get; set; } = "";
+    public string? Address {get;set;}
     public string? CpuSet { get; set; }
     public int Slot { get; set; }
     public PortSet Ports { get; set; } = PortSet.ForSlot(0);
@@ -70,6 +72,7 @@ public sealed class Instance
 }
 public sealed class Operation
 {
+    public bool UpdateGame {get;set;}=true;
     public string? ExpectedHostId {get;set;}
     public string? RenterName { get; set; }
     public string Id { get; set; } = "";
@@ -104,6 +107,7 @@ public interface IInfrastructure
     Task<HashSet<int>> BoundPorts(string hostId, string ip, CancellationToken ct);
     Task Start(string hostId, string ip, Instance instance, CancellationToken ct);
     Task Stop(string hostId, string ip, string instanceId, CancellationToken ct);
+    Task Update(string hostId,string ip,Instance instance,CancellationToken ct)=>Task.CompletedTask;
     Task Delete(string hostId, CancellationToken ct);
     Task<string> Logs(string hostId, string ip, string instanceId, CancellationToken ct);
     Task<string> Command(string hostId, string ip, Instance instance, string command, CancellationToken ct);
