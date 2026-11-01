@@ -48,6 +48,24 @@ public class RespawnHostTests
         Assert.Equal(replacement,File.ReadAllText(Path.Combine(f.Store.DirectoryPath,"respawn-token.txt")));
         Assert.DoesNotContain(Directory.EnumerateFiles(f.Store.DirectoryPath),p=>Path.GetFileName(p).StartsWith("respawn-token.txt.",StringComparison.Ordinal));
     }
+    [Fact] public async Task ReconnectingWithTheSameKeyDoesNotRequireStoppingServers()
+    {
+        using var f=new Fixture();var key="rsp_"+new string('a',64);
+        using var http=new HttpClient(new Handler(_=>Json("{\"data\":[{\"dockerState\":\"running\"}]}")));
+        using var api=new RespawnHost(f.Store,new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Respawn:Token",key}}).Build(),http);
+        await api.SaveToken(key,default);Assert.Equal(key,File.ReadAllText(Path.Combine(f.Store.DirectoryPath,"respawn-token.txt")));
+    }
+    [Fact] public async Task ExplicitlyRejectedOrderDoesNotBlockANewAttemptAfterTopUp()
+    {
+        using var f=new Fixture();int posts=0;
+        using var http=new HttpClient(new Handler(r=>r.Method==HttpMethod.Get?Json("""[{"id":1070,"memory":8192,"priceHourly":0.13324999}]"""):Reject()));
+        HttpResponseMessage Reject(){posts++;return Json("{}",HttpStatusCode.PaymentRequired);}
+        using var api=new RespawnHost(f.Store,new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Respawn:Token","rsp_"+new string('a',64)}}).Build(),http);
+        var request=new SquadHostManager.Core.RespawnRentRequest(Guid.NewGuid(),1070,0.13324999m,"eu");
+        await Assert.ThrowsAsync<RespawnApiException>(()=>api.Rent(request,default));Assert.False(api.Pending);
+        await Assert.ThrowsAsync<RespawnApiException>(()=>api.Rent(request,default));Assert.Equal(2,posts);
+        await Assert.ThrowsAsync<RespawnApiException>(()=>api.Rent(request with{RequestId=Guid.NewGuid()},default));Assert.Equal(3,posts);
+    }
     [Fact] public async Task EmptyUnconfiguredAccountDoesNotTrapProviderSelection()
     {
         using var f=new Fixture();using var client=new RespawnHost(f.Store,new ConfigurationBuilder().Build());

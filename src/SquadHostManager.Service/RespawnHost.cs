@@ -29,7 +29,7 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
     }
     public async Task SaveToken(string token,CancellationToken ct)
     {
-        if(Pending || Configured && await HasServers(ct))throw new InvalidOperationException("Сначала остановите серверы и завершите проверку заказов.");
+        if(Pending || Configured && token!=Token && await HasServers(ct))throw new InvalidOperationException("Сначала остановите серверы и завершите проверку заказов.");
         if(!Regex.IsMatch(token,"^rsp_[a-fA-F0-9]{64}$"))throw new ArgumentException("Неверный формат API-ключа.");
         using var request=new HttpRequestMessage(HttpMethod.Get,"https://respawnhost.com/api/v1/servers?limit=1");request.Headers.Add("X-Api-Key",token);
         using var response=await http.SendAsync(request,ct);if(!response.IsSuccessStatusCode)throw new InvalidOperationException($"RespawnHost: HTTP {(int)response.StatusCode}.");
@@ -99,14 +99,20 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
     public async Task<JsonElement> Rent(RespawnRentRequest request,CancellationToken ct)
     {
         if(request.RequestId==Guid.Empty)throw new ArgumentException("Нужен уникальный RequestId.");
-        if(Pending || store.Load<string>("respawn-order-"+request.RequestId)!=null)throw new InvalidOperationException("Заказ уже отправлен или требует сверки в панели RespawnHost. Не повторяйте аренду.");
+        var previous=store.Load<string>("respawn-order-"+request.RequestId);
+        if(Pending || previous is not (null or "rejected"))throw new InvalidOperationException("Заказ уже отправлен или требует сверки в панели RespawnHost. Не повторяйте аренду.");
         var plan=(await Plans(ct)).SingleOrDefault(p=>p.Id==request.PlanId);
         if(plan==null || plan.HourlyPrice!=request.HourlyPrice)throw new InvalidOperationException("Тариф изменился. Обновите список.");
         if(request.Region != "eu")throw new ArgumentException("Неверный регион.");
         if(!Configured)throw new InvalidOperationException("Добавьте API-ключ RespawnHost.");
         store.Save("respawn-order-"+request.RequestId,"sent");store.Save("respawn-pending-order",request.RequestId.ToString());
         // Never retry a paid POST: timeout/unknown reply leaves the order blocked for reconciliation.
-        var response=await Send(HttpMethod.Post,"/api/v1/servers/rent",new{game_short="squad",plan_id=request.PlanId,region=request.Region,billing_mode="hourly",instance_count=1,performance_tier="performance"},ct);
+        JsonElement response;
+        try{response=await Send(HttpMethod.Post,"/api/v1/servers/rent",new{game_short="squad",plan_id=request.PlanId,region=request.Region,billing_mode="hourly",instance_count=1,performance_tier="performance"},ct);}
+        catch(RespawnApiException error) when(error.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.PaymentRequired or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.UnprocessableEntity or System.Net.HttpStatusCode.TooManyRequests)
+        {
+            store.Save("respawn-order-"+request.RequestId,"rejected");store.Delete("respawn-pending-order");throw;
+        }
         var server=response.TryGetProperty("data",out var wrapped)?wrapped:response;
         if(!Guid.TryParse(Text(server,"panelUuid"),out _))throw new InvalidOperationException("Заказ отправлен. Проверьте его результат в панели RespawnHost.");
         var transitions=store.Load<Dictionary<string,string>>("respawn-power-pending")??[];transitions[Text(server,"panelUuid")!]="start";store.Save("respawn-power-pending",transitions);

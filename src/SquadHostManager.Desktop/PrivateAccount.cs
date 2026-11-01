@@ -10,6 +10,11 @@ namespace SquadHostManager.Desktop;
 public partial class MainWindow
 {
     private Func<HttpClient> cherryAccountHttp=()=>new HttpClient{Timeout=TimeSpan.FromSeconds(30)};
+    private void PersonalAccountClick(object sender,RoutedEventArgs e)
+    {
+        var provider=hostingProvider?.Selected??(LocalCoordinator.Configured?LocalCoordinator.Read().Provider:"cherry");
+        if(provider=="respawn")OwnRespawnClick(sender,e);else OwnCherryClick(sender,e);
+    }
     private async Task ConnectPersonalAccount()
     {
         rememberedInvitation=null;
@@ -19,13 +24,24 @@ public partial class MainWindow
         var account=LocalCoordinator.Read();
         var login=await Post<SessionResponse>("api/login",new LoginRequest("admin",account.Password),client);
         client.DefaultRequestHeaders.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",login.Token);
-        using var update=await client.PostAsJsonAsync("api/admin/cherry-key",new{account.Token,account.TeamId,account.ProjectId});await Check(update);
+        using var providerResponse=await client.GetAsync("api/hosting-provider");
+        if(providerResponse.StatusCode==System.Net.HttpStatusCode.NotFound)
+        {if(account.Provider=="respawn")throw new InvalidOperationException(L("respawnCoordinatorOld"));}
+        else
+        {
+            await Check(providerResponse);var provider=await providerResponse.Content.ReadFromJsonAsync<HostingProviderView>();
+            if(provider?.Selected!=account.Provider)await Post<HostingProviderView>("api/hosting-provider",new HostingProviderRequest(account.Provider),client);
+        }
+        if(account.Provider=="respawn")
+        {using var update=await client.PostAsJsonAsync("api/respawn/token",new RespawnTokenRequest(account.RespawnToken??""));await Check(update);}
+        else
+        {using var update=await client.PostAsJsonAsync("api/admin/cherry-key",new{account.Token,account.TeamId,account.ProjectId});await Check(update);}
         await Connect(login);
     }
     private async void OwnCherryClick(object sender,RoutedEventArgs e)
     {
         var editing=sender is FrameworkElement{Tag:"edit"};
-        if(LocalCoordinator.Configured && !editing){await Safe(ConnectPersonalAccount);return;}
+        if(LocalCoordinator.Configured && LocalCoordinator.Read().Provider=="cherry" && !editing){await Safe(ConnectPersonalAccount);return;}
         var dialog=new Window{Owner=this,Title=L("personalPath"),Width=740,Height=820,MinHeight=600,WindowStartupLocation=WindowStartupLocation.CenterOwner};
         var panel=new StackPanel{Margin=new Thickness(32)};dialog.Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         panel.Children.Add(new TextBlock{Text=L("accountStepOneHelp"),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,16)});
@@ -62,14 +78,15 @@ public partial class MainWindow
         connect.Click+=async(_,_)=>
         {
             if(projects.SelectedItem is not CherryProject project || validatedToken==null)return;working=true;status.Text=L("preparingAccount");connect.IsEnabled=inspect.IsEnabled=token.IsEnabled=projects.IsEnabled=false;
+            var previous=LocalCoordinator.Configured?LocalCoordinator.Read():null;var saved=false;
             try
             {
-                var account=LocalCoordinator.Configured?LocalCoordinator.Read():new LocalCoordinator.Account(validatedToken,project.TeamId,project.Id,Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
-                if(account.TeamId!=project.TeamId || account.ProjectId!=project.Id)throw new InvalidOperationException(L("privateAccountAlreadyConfigured"));
-                account=account with{Token=validatedToken};
-                LocalCoordinator.Save(account);await ConnectPersonalAccount();working=false;dialog.Close();Status.Text=L("accountReady");
+                var account=previous??new LocalCoordinator.Account(validatedToken,project.TeamId,project.Id,Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+                if(account.TeamId.Length>0 && (account.TeamId!=project.TeamId || account.ProjectId!=project.Id))throw new InvalidOperationException(L("privateAccountAlreadyConfigured"));
+                account=account with{Token=validatedToken,TeamId=project.TeamId,ProjectId=project.Id,Provider="cherry"};
+                LocalCoordinator.Save(account);saved=true;await ConnectPersonalAccount();working=false;dialog.Close();Status.Text=L("accountReady");
             }
-            catch(Exception error){status.Text=error is InvalidOperationException or TimeoutException?error.Message:L("accountNetworkError");}
+            catch(Exception error){if(saved && previous!=null)LocalCoordinator.Save(previous);status.Text=error is InvalidOperationException or TimeoutException?error.Message:L("accountNetworkError");}
             finally{working=false;connect.IsEnabled=inspect.IsEnabled=token.IsEnabled=projects.IsEnabled=true;}
         };
         dialog.ShowDialog();

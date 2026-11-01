@@ -13,7 +13,7 @@ public static class LocalCoordinator
     private static readonly string Root=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SquadHostManager","private-hosting");
     private static readonly string Settings=Path.Combine(Root,"account.dat");
     private static readonly SemaphoreSlim StartupLock=new(1,1);
-    public record Account(string Token,string TeamId,string ProjectId,string Password);
+    public record Account(string Token,string TeamId,string ProjectId,string Password,string Provider="cherry",string? RespawnToken=null);
     public static bool Configured=>File.Exists(Settings);
     public static Account Read()=>JsonSerializer.Deserialize<Account>(ProtectedData.Unprotect(File.ReadAllBytes(Settings),null,DataProtectionScope.CurrentUser))!;
     public static void Save(Account account)
@@ -69,6 +69,7 @@ public static class LocalCoordinator
         start.Environment["Cherry__ProjectId"]=account.ProjectId;
         start.Environment["Cherry__Region"]="DE-Frankfurt";
         start.Environment["Cherry__Plan"]="amd-ryzen-9950x";
+        if(account.RespawnToken is {} respawnToken)start.Environment["Respawn__Token"]=respawnToken;
         start.Environment["Hosting__PersonalMode"]="true";
         start.Environment["Ssh__KeyPath"]=Path.Combine(Root,"ssh-key");
         using var process=Process.Start(start)??throw new InvalidOperationException(Localization.T("localCoordinatorMissing"));

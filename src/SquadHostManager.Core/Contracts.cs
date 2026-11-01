@@ -5,6 +5,7 @@ public static class Product
     public const string Repository = "lACTEPUKCl/squad-host-manager";
     public const string SupportUrl = "https://buymeacoffee.com/flightschoolsquad";
     public const string ReferralUrl = "https://www.cherryservers.com/?affiliate=ZQ6937K6";
+    public const string RespawnRegistrationUrl = "https://panel.respawnhost.com";
 }
 public record RegisterRequest(string Name, string Password, string Invite);
 public record LoginRequest(string Name, string Password);

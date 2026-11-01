@@ -36,7 +36,7 @@ The key includes the connection address. You do not need a Cherry account. Your 
 ## Use your own Cherry account
 
 1. Create an API key in the Cherry Servers panel.
-2. Choose **My Cherry account** and enter the key.
+2. Choose **My own account → Connect Cherry Servers** and enter the key.
 3. Select your project.
 4. Open **Hosting**, choose an available location and confirm the rental.
 
@@ -54,7 +54,9 @@ The VPS stores settings and manages hosting. Squad runs on a separately rented C
 
 ## Use RespawnHost
 
-The hosting owner configures the coordinator with a RespawnHost API key that has the `servers` scope. Store it in `respawn-token.txt` in the coordinator data directory, readable only by the service account, or set `Respawn__Token` in the service environment. Do not put the key in the desktop app or share it with members.
+For your own account, choose **My own account → Connect RespawnHost** on the start screen. Create a RespawnHost account, generate an API key with the `servers` scope and connect it. No Cherry account, Cherry project or VPS is required. Setup verifies the key and prepares local management without renting a game server. Keep this computer online for management. Account settings are protected with Windows DPAPI.
+
+For an existing shared hosting installation, the owner configures the coordinator with the key. Store it in `respawn-token.txt` in the coordinator data directory, readable only by the service account, or set `Respawn__Token` in the service environment. Members do not need this key.
 
 1. Stop existing game servers, then use the switch button on **Hosting**.
 2. RespawnHost uses one fixed plan: **Germany, 8 GB**. The current price is shown before confirmation.

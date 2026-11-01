@@ -14,6 +14,11 @@ internal static class ProviderChecks
         void Call(string name)=>typeof(MainWindow).GetMethod(name,flags)!.Invoke(window,null);
         void Assert(bool condition,string message){if(!condition)throw new Exception(message);}
         Call("BuildHostingProviders");
+        Assert(window.FindName("OwnRespawnButton") is Button,"Own RespawnHost onboarding is missing");
+        var legacy=System.Text.Json.JsonSerializer.Deserialize<LocalCoordinator.Account>("""{"Token":"old","TeamId":"team","ProjectId":"project","Password":"password"}""")!;
+        Assert(legacy.Provider=="cherry" && legacy.RespawnToken==null,"Existing personal Cherry settings changed provider");
+        var respawnAccount=new LocalCoordinator.Account("","","","local-password","respawn","rsp_"+new string('a',64));
+        Assert(respawnAccount.Token=="" && respawnAccount.TeamId=="" && respawnAccount.ProjectId=="","Respawn signup requires Cherry credentials");
         Set("hostingProvider",new HostingProviderView("cherry",false,true));Call("RenderHostingProvider");
         Assert(((FrameworkElement)window.FindName("ProviderSelectorPanel")).Visibility==Visibility.Collapsed,"Switch visible with active servers");
         Set("hostingProvider",new HostingProviderView("cherry",true,true));Call("RenderHostingProvider");
@@ -40,7 +45,7 @@ internal static class ProviderChecks
         Assert(((Button)window.FindName("CommandButton")).IsEnabled,"RCON remains disabled despite gameReady");
         Call("RestoreServerDraft");
         Assert(Field<string>("selectedId")=="managed-instance" && !Field<bool>("draft"),"Draft restore replaced the active server");
-        foreach(var language in Localization.Languages){Localization.Apply(language,false);Assert(Localization.T("providerSwitchBlocked")!="providerSwitchBlocked","Missing provider translation");}
+        foreach(var language in Localization.Languages){Localization.Apply(language,false);Assert(Localization.T("providerSwitchBlocked")!="providerSwitchBlocked","Missing provider translation");Assert(Localization.T("respawnOwnHelp")!="respawnOwnHelp","Missing Respawn onboarding translation");}
         Localization.Apply("ru",false);
         Console.WriteLine("PASS: WPF hosting switch disabled while servers exist; Respawn mode; all seven languages");
     }
