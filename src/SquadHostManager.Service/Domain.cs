@@ -38,6 +38,7 @@ public sealed class PoolState
 }
 public sealed class Instance
 {
+    public bool ArchivePending {get;set;}
     public Dictionary<string,LogPosition> LogPositions {get;set;}=[];
     public string? RestoreBackupId {get;set;}
     public List<DateTimeOffset> RecoveryAttempts { get; set; }=[];

@@ -3,17 +3,18 @@ using SquadHostManager.Core;
 
 namespace SquadHostManager.Service;
 
-public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, IConfiguration? configuration = null)
+public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, IConfiguration? configuration = null, string stateKey = "pool", string? fixedProvider = null, object? creationGate = null, Func<string,int>? otherActive = null, Func<Guid,Operation?>? otherOperation = null)
 {
-    private readonly object gate = new();
+    private readonly object gate = creationGate??new();
     private readonly SemaphoreSlim worker = new(1, 1);
-    private PoolState state = LoadState(store);
-    private static PoolState LoadState(Store store)
+    private PoolState state = LoadState(store,stateKey,fixedProvider);
+    private static PoolState LoadState(Store store,string stateKey,string? fixedProvider)
     {
-        var state=store.Load<PoolState>("pool")??new();
+        var state=store.Load<PoolState>(stateKey)??new();
+        if(fixedProvider!=null)state.Provider=fixedProvider;
         foreach(var record in store.Load<List<RentalRecord>>("rental-history-import")??[])
             if(!state.Rentals.Any(r=>r.Id==record.Id))state.Rentals.Add(record);
-        store.Save("pool",state);
+        store.Save(stateKey,state);
         return state;
     }
     private readonly bool rentalDisabled = configuration?.GetValue<bool>("Cherry:DisableRent") ?? false;
@@ -183,7 +184,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         if(state.Rentals.Find(r=>r.Id==state.HostId) is {} record) { record.EndedAt=DateTimeOffset.UtcNow;record.EndTimeEstimated=estimated;record.State="cancelled"; }
         state.HostReachable=false;state.HostCheckedAt=DateTimeOffset.UtcNow;
     }
-    private void Save() { if (state.HostId == null && state.HostPhase == "empty") { state.RentedByName = null; state.ConnectedByName = null; } RecordParticipants(); store.Save("pool", state); Changed?.Invoke(); }
+    private void Save() { if (state.HostId == null && state.HostPhase == "empty") { state.RentedByName = null; state.ConnectedByName = null; } RecordParticipants(); store.Save(stateKey, state); Changed?.Invoke(); }
     private void RecordParticipants()
     {
         RefreshManagedCosts();
@@ -227,7 +228,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     private Operation? Existing(User user, Guid requestId)
     {
         if (requestId == Guid.Empty) throw new ArgumentException("Нужен уникальный RequestId.");
-        var op = state.Operations.Find(o => o.Id == requestId.ToString("N"));
+        var op = state.Operations.Find(o => o.Id == requestId.ToString("N"))??otherOperation?.Invoke(requestId);
         if (op != null && op.UserId != user.Id) throw new UnauthorizedAccessException("Запрос принадлежит другому пользователю.");
         return op;
     }
@@ -546,6 +547,21 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
                 throw;
             }
             List<Instance> running;
+            if(state.Provider=="respawn")
+            {
+                List<Instance> offline;
+                lock(gate)offline=state.Instances.Where(i=>(i.Phase is "running" or "error" || i.Phase=="stopped" && i.ArchivePending) && inventory.Any(r=>r.Id==i.Id && !r.Running) && !state.Operations.Any(o=>o.InstanceId==i.Id && o.Phase is "queued" or "running")).ToList();
+                foreach(var inst in offline)
+                {
+                    string? archiveError=null;
+                    try{await PreserveMatchArchive(inst,Guid.NewGuid().ToString("N"),ct);}
+                    catch(Exception e) when(e is not OperationCanceledException){archiveError="Сервер остановлен. Не удалось сохранить архив логов: "+(e.InnerException?.Message??e.Message);}
+                    lock(gate)
+                    {
+                        inst.Phase="stopped";inst.RecoveryNeeded=false;inst.ArchivePending=archiveError!=null;inst.GameState=null;inst.DownloadPercent=null;inst.ProgressKey=null;inst.Error=archiveError;state.LastEvent="Сервер отключён у провайдера";Save();
+                    }
+                }
+            }
             lock (gate) running = state.Instances.Where(i => i.Phase is "running" or "error" && inventory.Any(r => r.Id == i.Id && r.Running)).ToList();
             foreach (var inst in running)
             {

@@ -12,8 +12,9 @@ if (args.Length == 2 && args[0] == "--check-removal")
     try
     {
         using var store = new Store(args[1]);
-        var state = store.Load<PoolState>("pool") ?? new();
-        Environment.ExitCode = RemovalSafety.CanRemove(state) ? 0 : 43;
+        var primary=store.Load<PoolState>("pool")??new();var other=primary.Provider=="respawn"?"cherry":"respawn";
+        var states=new[]{primary,store.Load<PoolState>("pool-"+other)??store.Load<PoolState>("provider-state-"+other)};
+        Environment.ExitCode = states.Where(s=>s!=null).All(s=>RemovalSafety.CanRemove(s!)) ? 0 : 43;
     }
     catch { Environment.ExitCode = 44; }
     return;
@@ -22,12 +23,20 @@ var builder = WebApplication.CreateBuilder(args);
 var dataDir = builder.Configuration["DataDir"] ?? Path.Combine(AppContext.BaseDirectory, "data");
 builder.Services.AddSingleton(new Store(dataDir));
 builder.Services.AddSingleton<Accounts>();
-builder.Services.AddSingleton<AccountBalance>();
-builder.Services.AddSingleton<RentalCatalog>();
+builder.Services.AddSingleton(s=>new AccountBalance(s.GetRequiredService<CherryInfrastructure>()));
+builder.Services.AddSingleton(s=>new RentalCatalog(s.GetRequiredService<CherryInfrastructure>()));
 builder.Services.AddSingleton<CherryInfrastructure>();
 builder.Services.AddSingleton<RespawnInfrastructure>();
 builder.Services.AddSingleton<IInfrastructure,HostingInfrastructure>();
-builder.Services.AddSingleton<PoolCoordinator>();
+builder.Services.AddSingleton(s=>new HostingPools(s.GetRequiredService<Store>(),provider=>new HostingInfrastructure(s.GetRequiredService<CherryInfrastructure>(),s.GetRequiredService<RespawnInfrastructure>(),s.GetRequiredService<Store>(),provider),s.GetRequiredService<IConfiguration>()));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped(s=>
+{
+    var c=s.GetRequiredService<IHttpContextAccessor>().HttpContext??throw new InvalidOperationException("Нет запроса.");
+    var user=new User(c.User.FindFirstValue(ClaimTypes.NameIdentifier)!,c.User.Identity!.Name!,c.User.IsInRole("admin"));
+    var id=c.Request.RouteValues.GetValueOrDefault("id")?.ToString()??c.Request.Query["instanceId"].FirstOrDefault();
+    return s.GetRequiredService<HostingPools>().Resource(user,id);
+});
 builder.Services.AddSingleton<RespawnHost>();
 builder.Services.AddHostedService<PoolWorker>();
 builder.Services.AddHostedService<AutomationWorker>();
@@ -84,23 +93,14 @@ app.MapPost("/api/key-login", (KeyLoginRequest r) => accounts.KeyLogin(r)).Requi
 var api = app.MapGroup("/api").RequireAuthorization().RequireRateLimiting("user");
 static User Current(HttpContext c) => new(c.User.FindFirstValue(ClaimTypes.NameIdentifier)!, c.User.Identity!.Name!, c.User.IsInRole("admin"));
 api.MapPost("/logout", (HttpContext c) => { accounts.Logout(c.Request.Headers.Authorization.ToString()[7..]); return Results.NoContent(); });
-api.MapGet("/hosting-provider",async(PoolCoordinator pool,RespawnHost respawn,HttpContext c)=>
-{
-    var view=pool.Provider();
-    if(view.Selected=="respawn" && view.CanSwitch)
-    {
-        try{if(await respawn.HasServers(c.RequestAborted))view=view with{CanSwitch=false};}
-        catch(Exception) when(!c.RequestAborted.IsCancellationRequested){view=view with{CanSwitch=false};}
-    }
-    return view;
-});
-api.MapPost("/hosting-provider",(HostingProviderRequest r,HttpContext c,PoolCoordinator pool,RespawnHost respawn)=>pool.SwitchProvider(Current(c),r.Provider,()=>respawn.HasServers(c.RequestAborted),c.RequestAborted));
+api.MapGet("/hosting-provider",(HostingPools pools,HttpContext c)=>pools.View(Current(c)));
+api.MapPost("/hosting-provider",(HostingProviderRequest r,HttpContext c,HostingPools pools)=>pools.Select(Current(c),r.Provider));
 api.MapGet("/respawn",async(HttpContext c,RespawnHost respawn)=>new RespawnView(respawn.Configured,await respawn.Plans(c.RequestAborted),[],respawn.Pending));
 api.MapPost("/respawn/token",(RespawnTokenRequest r,HttpContext c,PoolCoordinator pool,RespawnHost respawn)=>pool.OnRespawn(Current(c),async()=>{await respawn.SaveToken(r.Token,c.RequestAborted);return new{saved=true};},c.RequestAborted));
-api.MapPost("/respawn/rent",(RespawnRentRequest r,HttpContext c,PoolCoordinator pool,RespawnHost respawn)=>pool.StartRespawn(Current(c),r,respawn,c.RequestAborted));
+api.MapPost("/respawn/rent",(RespawnRentRequest r,HttpContext c,HostingPools pools,RespawnHost respawn)=>pools.Request(Current(c),r.RequestId).StartRespawn(Current(c),r,respawn,c.RequestAborted));
 api.MapGet("/pool", async (HttpContext c, PoolCoordinator pool) => { if (c.Request.Query["refresh"] == "true") { try { await pool.Reconcile(c.RequestAborted); } catch (Exception) when (!c.RequestAborted.IsCancellationRequested) { } } return pool.Snapshot(Current(c)); });
 api.MapPost("/admin/retry-installations",(HttpContext c,PoolCoordinator pool)=>pool.RetryFailedInstallations(Current(c)));
-api.MapPost("/rent", async (RentHostRequest r, PoolCoordinator pool,HttpContext c) => Results.Accepted(value:await pool.RentHost(Current(c),r,c.RequestAborted)));
+api.MapPost("/rent", async (RentHostRequest r, HostingPools pools,HttpContext c) => Results.Accepted(value:await pools.Request(Current(c),r.RequestId).RentHost(Current(c),r,c.RequestAborted)));
 api.MapGet("/locations", (RentalCatalog catalog, HttpContext c) => catalog.Read(c.RequestAborted));
 api.MapGet("/location", (Store store,IConfiguration config) => new RentalLocationRequest(store.Load<string>("rental-region")??config["Cherry:Region"]??"DE-Frankfurt"));
 api.MapPost("/location", async (RentalLocationRequest r, PoolCoordinator pool, HttpContext c) => { await pool.SetRegion(Current(c),r.Region,c.RequestAborted); return Results.NoContent(); });
@@ -116,8 +116,8 @@ api.MapPost("/admin/cherry-key", (HttpContext c, PersonalAccountKeyRequest reque
 api.MapPost("/admin/users", (HttpContext c, CreateUserRequest r) => { if(builder.Configuration.GetValue<bool>("Hosting:PersonalMode"))throw new InvalidOperationException("Личный хостинг не принимает подключения с других компьютеров.");return accounts.CreateUser(Current(c), r.Name); });
 api.MapPost("/admin/users/{id}/key", (HttpContext c, string id) => accounts.RotateKey(Current(c), id));
 api.MapPost("/admin/users/{id}/revoke", (HttpContext c, string id) => { accounts.RevokeUser(Current(c), id); return Results.NoContent(); });
-api.MapPost("/instances", (HttpContext c, PoolCoordinator pool, StartRequest r) => Results.Accepted(value: pool.Start(Current(c), r)));
-api.MapPost("/stop", (HttpContext c, PoolCoordinator pool, StopRequest r) => Results.Accepted(value: pool.Stop(Current(c), r)));
+api.MapPost("/instances", (HttpContext c, HostingPools pools, StartRequest r) => Results.Accepted(value: pools.Request(Current(c),r.RequestId,r.InstanceId).Start(Current(c), r)));
+api.MapPost("/stop", (HttpContext c, HostingPools pools, StopRequest r) => Results.Accepted(value: pools.Request(Current(c),r.RequestId,r.InstanceId).Stop(Current(c), r)));
 api.MapPost("/instances/{id}/settings", (string id, ServerSettingsRequest r, HttpContext c, PoolCoordinator pool) => { pool.Settings(Current(c), id, r); return Results.NoContent(); });
 api.MapPost("/instances/{id}/restart", (string id, RestartRequest r, HttpContext c, PoolCoordinator pool) => Results.Accepted(value: pool.Restart(Current(c), id, r)));
 api.MapGet("/instances/{id}/logs", async (string id, HttpContext c, PoolCoordinator pool) => new { output = await pool.Access(Current(c), id, null, c.RequestAborted) });
@@ -136,7 +136,7 @@ api.MapGet("/balance",async(HttpContext c,AccountBalance balance)=>{Current(c);r
 api.MapGet("/server-defaults",(HttpContext c,PoolCoordinator pool)=>pool.Defaults(Current(c)));
 api.MapGet("/server-defaults/versions",(string file,HttpContext c,PoolCoordinator pool)=>pool.CommonConfigHistory(Current(c),file));
 api.MapGet("/server-defaults/stock",(string file,HttpContext c,PoolCoordinator pool)=>new{output=pool.StandardConfig(Current(c),file)});
-api.MapPost("/server-defaults/config",async(HttpContext c,PoolCoordinator pool,ConfigRequest request)=>await pool.SaveCommonConfig(Current(c),request,c.RequestAborted));
+api.MapPost("/server-defaults/config",async(HttpContext c,HostingPools pools,ConfigRequest request)=>await pools.SaveCommonConfig(Current(c),request,c.RequestAborted));
 api.MapGet("/server-tools",(string? instanceId,HttpContext c,PoolCoordinator pool)=>pool.Tools(Current(c),instanceId));
 api.MapPost("/admin/prepare",(RestartRequest r,HttpContext c,PoolCoordinator pool)=>Results.Accepted(value:pool.RetryHostPreparation(Current(c),r)));
 api.MapGet("/matches/{id}/archive",(string id,HttpContext c,PoolCoordinator pool)=>Results.File(pool.DownloadMatchArchive(Current(c),id),"application/gzip","squad-logs.tar.gz"));
@@ -188,9 +188,10 @@ namespace SquadHostManager.Service
     {
         public override async Task OnConnectedAsync() { await Clients.Caller.SendAsync("changed"); await base.OnConnectedAsync(); }
     }
-    public sealed class PoolWorker(PoolCoordinator pool, IHubContext<PoolHub> hub, ILogger<PoolWorker> logger) : BackgroundService
+    public sealed class PoolWorker(HostingPools pools, IHubContext<PoolHub> hub, ILogger<PoolWorker> logger) : BackgroundService
     {
-        protected override async Task ExecuteAsync(CancellationToken ct)
+        protected override Task ExecuteAsync(CancellationToken ct)=>Task.WhenAll(pools.All.Select(pool=>Run(pool,ct)));
+        private async Task Run(PoolCoordinator pool,CancellationToken ct)
         {
             pool.Changed += () => _ = Broadcast(ct);
             var tick = 0;

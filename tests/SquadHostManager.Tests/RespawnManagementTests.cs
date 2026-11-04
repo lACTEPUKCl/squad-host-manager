@@ -12,6 +12,38 @@ public class RespawnManagementTests
     {protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(send(request));}
     private static HttpResponseMessage Json(string text)=>new(HttpStatusCode.OK){Content=new StringContent(text,Encoding.UTF8,"application/json")};
     private static IConfiguration Config()=>new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Respawn:Token","rsp_"+new string('a',64)}}).Build();
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListedLogContent404UsesSignedDownloadWithoutForwardingApiKey(bool streaming)
+    {
+        using var f=new Fixture();var calls=new List<string>();
+        using var http=new HttpClient(new Handler(r=>
+        {
+            calls.Add(r.RequestUri!.AbsolutePath);Assert.Equal(HttpMethod.Get,r.Method);
+            if(r.RequestUri.Host=="node3.eu.respawnhost.com")
+            {Assert.False(r.Headers.Contains("X-Api-Key"));return new(HttpStatusCode.OK){Content=new StringContent("complete log")};}
+            Assert.True(r.Headers.Contains("X-Api-Key"));
+            Assert.Contains("file=%2FSquadGame%2FSaved%2FLogs%2FSquadGame.log",r.RequestUri.Query);
+            return r.RequestUri.AbsolutePath.EndsWith("/content")?new(HttpStatusCode.NotFound):Json("{\"url\":\"https://node3.eu.respawnhost.com:8080/download?token=private\"}");
+        }));
+        using var api=new RespawnHost(f.Store,Config(),http);
+        using var output=new MemoryStream();
+        if(streaming)await api.CopyFile(Id,"/SquadGame/Saved/Logs/SquadGame.log",output,default);
+        else await output.WriteAsync(await api.ReadFile(Id,"/SquadGame/Saved/Logs/SquadGame.log",default));
+        Assert.Equal("complete log",Encoding.UTF8.GetString(output.ToArray()));Assert.Equal(3,calls.Count);
+    }
+    [Theory]
+    [InlineData("http://node3.eu.respawnhost.com/download")]
+    [InlineData("https://respawnhost.com.evil.test/download")]
+    [InlineData("https://user@node3.eu.respawnhost.com/download")]
+    public async Task SignedDownloadRejectsUntrustedAddresses(string url)
+    {
+        using var f=new Fixture();int calls=0;
+        using var http=new HttpClient(new Handler(r=>{calls++;return r.RequestUri!.AbsolutePath.EndsWith("/content")?new(HttpStatusCode.NotFound):Json(System.Text.Json.JsonSerializer.Serialize(new{url}));}));
+        using var api=new RespawnHost(f.Store,Config(),http);
+        await Assert.ThrowsAsync<IOException>(()=>api.ReadFile(Id,"/SquadGame/Saved/Logs/SquadGame.log",default));Assert.Equal(2,calls);
+    }
     [Fact] public async Task NewServerWaitsForStartupVariablesWithoutOrderingAgain()
     {
         using var f=new Fixture();int reads=0;

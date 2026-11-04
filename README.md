@@ -58,7 +58,7 @@ For your own account, choose **My own account → Connect RespawnHost** on the s
 
 For an existing shared hosting installation, the owner configures the coordinator with the key. Store it in `respawn-token.txt` in the coordinator data directory, readable only by the service account, or set `Respawn__Token` in the service environment. Members do not need this key.
 
-1. Stop existing game servers, then use the switch button on **Hosting**.
+1. Use the switch button on **Hosting** to choose a provider. Each member's selection is independent; existing servers keep running on their provider.
 2. RespawnHost uses one fixed plan: **Germany, 8 GB**. The current price is shown before confirmation.
 3. Rent a server and manage it through the normal configuration, mods, players, console and files pages.
 

@@ -26,7 +26,7 @@ public sealed partial class RespawnHost
     }
     public async Task CopyFile(string id,string path,Stream target,CancellationToken ct)
     {
-        using var response=await FileRequest(HttpMethod.Get,id,path,null,ct);
+        using var response=await DownloadResponse(id,path,ct);
         if(response.Content.Headers.ContentLength>2L*1024*1024*1024)throw new IOException("Файл больше 2 GiB.");
         await using var source=await response.Content.ReadAsStreamAsync(ct);await BackupFormat.Copy(source,target,2L*1024*1024*1024,ct);
     }
@@ -45,9 +45,29 @@ public sealed partial class RespawnHost
     }
     public async Task<byte[]> ReadFile(string id,string path,CancellationToken ct)
     {
-        using var response=await FileRequest(HttpMethod.Get,id,path,null,ct);
+        using var response=await DownloadResponse(id,path,ct);
         if(response.Content.Headers.ContentLength>128L*1024*1024)throw new IOException("Файл больше 128 MiB.");
         await using var source=await response.Content.ReadAsStreamAsync(ct);using var output=new MemoryStream();await BackupFormat.Copy(source,output,128L*1024*1024,ct);return output.ToArray();
+    }
+    private async Task<HttpResponseMessage> DownloadResponse(string id,string path,CancellationToken ct)
+    {
+        try{return await FileRequest(HttpMethod.Get,id,path,null,ct);}
+        catch(HttpRequestException e) when(e.StatusCode==HttpStatusCode.NotFound && path.StartsWith("/SquadGame/Saved/",StringComparison.Ordinal))
+        {
+            // The content endpoint can report 404 for an existing large log.
+            // Use the provider's download token; never forward the account key to its node.
+            var ticket=await Send(HttpMethod.Get,$"/api/v1/servers/{id}/files/token?file="+Uri.EscapeDataString(path),null,ct);
+            if(!Uri.TryCreate(Text(ticket,"url"),UriKind.Absolute,out var url) || url.Scheme!="https" || url.UserInfo.Length!=0 || !(url.IsDefaultPort || url.Port==8080) ||
+                !(url.Host.Equals("respawnhost.com",StringComparison.OrdinalIgnoreCase) || url.Host.EndsWith(".respawnhost.com",StringComparison.OrdinalIgnoreCase)))
+                throw new IOException("RespawnHost: недопустимый адрес скачивания файла.");
+            using var request=new HttpRequestMessage(HttpMethod.Get,url);
+            HttpResponseMessage response;
+            try{response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);}
+            catch(HttpRequestException){throw new IOException("RespawnHost: не удалось скачать файл.");}
+            if(!response.IsSuccessStatusCode)
+            {var status=response.StatusCode;response.Dispose();throw new HttpRequestException($"RespawnHost download: HTTP {(int)status}.",null,status);}
+            return response;
+        }
     }
     public async Task WriteFile(string id,string path,byte[] content,CancellationToken ct)
     {if(content.Length>128*1024*1024)throw new ArgumentException("Файл больше 128 MiB.");using var response=await FileRequest(HttpMethod.Post,id,path,content,ct);}

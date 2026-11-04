@@ -21,9 +21,6 @@ public partial class MainWindow
         {
             if(hostingProvider?.CanSwitch!=true)return;
             var target=hostingProvider.Selected=="cherry"?"respawn":"cherry";
-            var name=target=="respawn"?"RespawnHost":"Cherry Servers";
-            var message=L("providerSwitchConfirm",name)+(hostingProvider.CherryRented?"\n\n"+L("providerCherryStillRented"):"");
-            if(!Confirm(message,L("providerSwitch")))return;
             await Post<HostingProviderView>("api/hosting-provider",new HostingProviderRequest(target));
             selectedId=null;displayedInstance=null;ClearInstanceViews();
             await Refresh();await LoadHostingProviders(true);
@@ -69,8 +66,8 @@ public partial class MainWindow
     {
         if(hostingProvider==null || providerApply==null)return;
         var respawn=hostingProvider.Selected=="respawn";
-        ProviderSelectorPanel.Visibility=session?.IsAdmin==true && hostingProvider.CanSwitch?Visibility.Visible:Visibility.Collapsed;
-        providerApply.IsEnabled=hostingProvider.CanSwitch && session?.IsAdmin==true;
+        ProviderSelectorPanel.Visibility=hostingProvider.CanSwitch?Visibility.Visible:Visibility.Collapsed;
+        providerApply.IsEnabled=hostingProvider.CanSwitch;
         providerApply.Content=L("providerSwitchTo",respawn?"Cherry Servers":"RespawnHost");
         HostingLayout.Visibility=respawn?Visibility.Collapsed:Visibility.Visible;
         RespawnHostingPanel.Visibility=respawn?Visibility.Visible:Visibility.Collapsed;RespawnHostingPanel.IsEnabled=true;

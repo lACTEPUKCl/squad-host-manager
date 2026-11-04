@@ -7,7 +7,7 @@ public sealed partial class PoolCoordinator
     private void EnforceQuota(User user,Instance? restarting)
     {
         var accounts=new Accounts(store);accounts.EnsureAccess(user.Id);
-        if(!user.IsAdmin && state.Instances.Count(i=>i.OwnerId==user.Id && Occupied(i) && i!=restarting)>=accounts.Policy(user.Id).MaxServers)throw new InvalidOperationException("Достигнут лимит серверов пользователя.");
+        if(!user.IsAdmin && state.Instances.Count(i=>i.OwnerId==user.Id && Occupied(i) && i!=restarting)+(otherActive?.Invoke(user.Id)??0)>=accounts.Policy(user.Id).MaxServers)throw new InvalidOperationException("Достигнут лимит серверов пользователя.");
     }
     private void Notify(string owner,string code,string? instance,string detail)
     {

@@ -1,8 +1,9 @@
 namespace SquadHostManager.Service;
 
-public sealed class AutomationWorker(PoolCoordinator pool,ILogger<AutomationWorker> logger):BackgroundService
+public sealed class AutomationWorker(HostingPools pools,ILogger<AutomationWorker> logger):BackgroundService
 {
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    protected override Task ExecuteAsync(CancellationToken ct)=>Task.WhenAll(pools.All.Select(pool=>Run(pool,ct)));
+    private async Task Run(PoolCoordinator pool,CancellationToken ct)
     {
         while(!ct.IsCancellationRequested)
         {

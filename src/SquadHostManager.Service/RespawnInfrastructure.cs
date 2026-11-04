@@ -111,7 +111,8 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
     }
     public async Task<List<RemoteInstance>> Inventory(string host,string ip,CancellationToken ct)
     {
-        var state=store.Load<PoolState>("pool")??new();var maps=state.Instances.Select(i=>(i.Id,Map:store.Load<RespawnManagedServer>("respawn-instance-"+i.Id))).Where(x=>x.Map!=null).ToList();
+        var primary=store.Load<PoolState>("pool");
+        var state=primary?.Provider=="respawn"?primary:store.Load<PoolState>("pool-respawn")??new();var maps=state.Instances.Select(i=>(i.Id,Map:store.Load<RespawnManagedServer>("respawn-instance-"+i.Id))).Where(x=>x.Map!=null).ToList();
         return (await api.Servers(ct)).Select(s=>
         {
             var own=maps.Find(m=>m.Map!.Uuid==s.Id);

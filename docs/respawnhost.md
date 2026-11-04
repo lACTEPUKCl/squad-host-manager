@@ -1,16 +1,18 @@
 # RespawnHost
 
-Choose Cherry Servers or RespawnHost on the Hosting page. Switching requires every server on the current provider to be stopped and all queued operations to finish. The service verifies the remote state and rejects concurrent starts. It keeps separate server profiles for each provider, with shared configuration, users, notifications, backups and saved match archives. Switching does not cancel a Cherry rental; it remains billed until explicitly released.
+Choose Cherry Servers or RespawnHost on the Hosting page. Each member has their own saved selection. Servers can run on both providers at the same time; choosing another provider does not stop, move or hide servers from their provider's management pages. Common configuration and users are shared. Runtime state, operations and server history stay with their provider. Switching does not cancel a Cherry rental; it remains billed until explicitly released.
 
 The hosting owner connects an API key with the `servers` scope. The key stays in the coordinator data directory, with mode 0600 on Linux, and is never returned to members. Members use their normal application session and can manage only their own servers. Existing rental permissions and quotas still apply.
 
-Select a Squad plan and region, configure the server name/password/mods in the regular server form, then confirm the order. The first plan is 8 GB. A paid POST is never automatically replayed. Unconfirmed orders block another rental and provider switching until their outcome is resolved.
+RespawnHost uses the Germany 8 GB plan. Configure the server name/password/mods in the regular server form, then confirm the order. A paid POST is never automatically replayed. Unconfirmed orders block another RespawnHost rental until their outcome is resolved; they do not block viewing or using Cherry Servers. User rental permissions and total server limits still apply across both providers.
 
 The regular application pages handle configuration and admin groups, Workshop settings, players and match controls over real RCON, logs, file downloads, match history, archives, backup import/export, cloning and restoration. Common config is retained before rental. Server.cfg receives the selected server's name, password and player limit. Empty common License.cfg does not erase a provider-supplied licence. Rcon.cfg stays private to the adapter.
 
 Workshop IDs are applied through the editable `WORKSHOP_ITEMS` startup variable, separated by commas. Changed mods require the provider's clean-install workflow. If no supported variable is exposed, the operation fails explicitly rather than reporting success. RCON uses an allocated external port configured in Rcon.cfg; console command acknowledgements are not treated as game replies. Missing connection details prevent a command from being sent.
 
 Before stopping, logs and OSI_Scoreboards are streamed into a private local archive. An archive failure blocks the stop. Saved archives remain downloadable after the provider context closes. PAYG game-server objects remain allocated but offline; the adapter does not delete remote files to stop billing.
+
+If a server is stopped in the provider panel, reconciliation marks it stopped and saves its logs without sending power commands. An archive error is retried separately and does not turn an offline server into a running reservation. Large log files that return 404 from the content API are downloaded through the provider's signed file URL.
 
 Manual restart/update saves local recovery data, requests reinstall with keep_files=true, subscribes to the node installation stream before the request and waits for a successful completion event, restores match files/licence and reapplies shared config/mods before starting. Crash recovery starts the existing server without requesting a reinstall. A provider that does not expose installation completion leaves the operation pending/error instead of claiming the game was updated.
 

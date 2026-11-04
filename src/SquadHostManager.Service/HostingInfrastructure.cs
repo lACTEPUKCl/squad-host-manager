@@ -1,8 +1,8 @@
 using SquadHostManager.Core;
 namespace SquadHostManager.Service;
-public sealed class HostingInfrastructure(CherryInfrastructure cherry,RespawnInfrastructure respawn,Store store):IInfrastructure
+public sealed class HostingInfrastructure(CherryInfrastructure cherry,RespawnInfrastructure respawn,Store store,string? provider=null):IInfrastructure
 {
-    private IInfrastructure Selected=>store.Load<PoolState>("pool")?.Provider=="respawn"?respawn:cherry;
+    private IInfrastructure Selected=>(provider??store.Load<PoolState>("pool")?.Provider)=="respawn"?respawn:cherry;
     private IInfrastructure For(string host)=>host.StartsWith(RespawnInfrastructure.Prefix,StringComparison.Ordinal)?respawn:cherry;
     public Task<BalanceView> Balance(CancellationToken ct)=>Selected.Balance(ct);
     public Task<List<RentalLocation>> Locations(CancellationToken ct)=>Selected.Locations(ct);

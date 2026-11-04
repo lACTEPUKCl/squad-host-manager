@@ -24,6 +24,9 @@ internal static class ProviderChecks
         Set("hostingProvider",new HostingProviderView("cherry",true,true));Call("RenderHostingProvider");
         Assert(Field<Button>("providerApply").IsEnabled,"Switch disabled after all servers stopped");
         Assert(((FrameworkElement)window.FindName("ProviderSelectorPanel")).Visibility==Visibility.Visible,"Switch hidden with no servers");
+        var session=Field<SessionResponse>("session");Set("session",session with{IsAdmin=false});Call("RenderHostingProvider");
+        Assert(Field<Button>("providerApply").IsEnabled && ((FrameworkElement)window.FindName("ProviderSelectorPanel")).Visibility==Visibility.Visible,"Members cannot choose their hosting provider");
+        Set("session",session);
         Assert(!((StackPanel)window.FindName("ProviderSelectorPanel")).Children.OfType<ComboBox>().Any(),"Provider dropdown remains visible");
         Set("hostingProvider",new HostingProviderView("respawn",false,true));Call("RenderHostingProvider");
         Assert(((FrameworkElement)window.FindName("HostingLayout")).Visibility==Visibility.Collapsed,"Cherry controls visible in Respawn mode");
@@ -47,6 +50,6 @@ internal static class ProviderChecks
         Assert(Field<string>("selectedId")=="managed-instance" && !Field<bool>("draft"),"Draft restore replaced the active server");
         foreach(var language in Localization.Languages){Localization.Apply(language,false);Assert(Localization.T("providerSwitchBlocked")!="providerSwitchBlocked","Missing provider translation");Assert(Localization.T("respawnOwnHelp")!="respawnOwnHelp","Missing Respawn onboarding translation");}
         Localization.Apply("ru",false);
-        Console.WriteLine("PASS: WPF hosting switch disabled while servers exist; Respawn mode; all seven languages");
+        Console.WriteLine("PASS: WPF hosting choice available to members; Respawn mode; all seven languages");
     }
 }
