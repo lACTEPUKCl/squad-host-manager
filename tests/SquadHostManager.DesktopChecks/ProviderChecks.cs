@@ -36,7 +36,10 @@ internal static class ProviderChecks
         Assert(((FrameworkElement)window.FindName("OverviewBillingNote")).Visibility==Visibility.Visible,"Missing per-second billing note");
         Assert(!((Button)window.FindName("RentHostButton")).IsEnabled,"Cherry host rental remains enabled in Respawn mode");
         Set("pool",new PoolView(new("respawn:test","respawnhost.com","ready",null),[new("managed-instance","owner","Owner","Managed Squad",0,PortSet.ForSlot(0),"running",true,null,"gameReady",Address:"203.0.113.8:7787")],false,false,null));
-        Set("selectedId","managed-instance");Call("RenderPool");Call("RenderHostingProvider");
+        Set("selectedId","managed-instance");Call("RenderPool");
+        Assert(((TextBlock)window.FindName("HostStatus")).Text=="RespawnHost","Background snapshot temporarily replaced the RespawnHost heading with Cherry connection text");
+        Assert(((TextBlock)window.FindName("OverviewAddress")).Text=="203.0.113.8:7787","Background snapshot temporarily replaced the Respawn address");
+        Call("RenderHostingProvider");
         Assert(((Button)window.FindName("RestartButton")).IsEnabled,"Managed restart disabled");
         Assert(((Button)window.FindName("CommandButton")).IsEnabled,"Managed RCON disabled");
         Assert(((Button)window.FindName("ArchiveButton")).IsEnabled,"Managed archive disabled");

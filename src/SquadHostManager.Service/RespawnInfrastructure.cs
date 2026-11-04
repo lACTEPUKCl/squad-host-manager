@@ -241,8 +241,10 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
             var pending=store.Load<Dictionary<string,string>>("respawn-power-pending")??[];
             return new(server?.State is "installing"?"gameInstalling":server?.State=="starting" || pending.GetValueOrDefault(Managed(instance.Id).Uuid)=="start"?"gameStarting":"gameUnavailable");
         }
-        try{var reply=await Command(host,ip,instance,"ListPlayers",ct);if(RconCommands.Rejected(reply) || !reply.Contains("Active Players",StringComparison.OrdinalIgnoreCase))return new("gameStarting");return new("gameReady");}
-        catch(Exception) when(!ct.IsCancellationRequested){return new("gameStarting");}
+        // Provider runtime and RCON readiness are separate facts. A missing RCON
+        // password or allocation must not turn a running server into endless startup.
+        try{var reply=await Command(host,ip,instance,"ListPlayers",ct);if(RconCommands.Rejected(reply) || !reply.Contains("Active Players",StringComparison.OrdinalIgnoreCase))return new("running");return new("gameReady");}
+        catch(Exception) when(!ct.IsCancellationRequested){return new("running");}
     }
     public async Task<MetricSample> Metrics(string host,string ip,Instance instance,CancellationToken ct)
     {

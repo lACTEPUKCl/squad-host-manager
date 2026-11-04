@@ -367,7 +367,7 @@
             </Expander></Border>
         <StackPanel Grid.Row="2" Margin="0,16,0,0">
             <ProgressBar x:Name="Activity" Height="3" IsIndeterminate="True" Visibility="Hidden" Margin="0,0,0,10" />
-            <TextBlock x:Name="Status" Text="{DynamicResource noConnection}" TextWrapping="Wrap" Width="192" HorizontalAlignment="Left" FontSize="12" LineHeight="18" />
+            <TextBlock x:Name="Status" Text="{DynamicResource noConnection}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text,RelativeSource={RelativeSource Self}}" Width="192" Height="18" HorizontalAlignment="Left" FontSize="12" LineHeight="18" />
 
         </StackPanel>
     </Grid>

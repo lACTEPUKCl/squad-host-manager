@@ -127,9 +127,8 @@ public partial class MainWindow : Window
             if(pin!=null)o.WebSocketConfiguration=socket=>socket.RemoteCertificateValidationCallback=(_,certificate,_,errors)=>HostingTransport.AcceptCertificate(certificate as System.Security.Cryptography.X509Certificates.X509Certificate2,errors,pin);
         }).WithAutomaticReconnect().Build();
         hub.On("changed", () => Dispatcher.InvokeAsync(async () => await BackgroundRefresh()));
-        hub.Reconnected += _ => Dispatcher.InvokeAsync(async () => await Safe(Refresh)).Task;
-        hub.Reconnecting += _ => Dispatcher.InvokeAsync(() => Status.Text = L("polling")).Task;
-        try { await hub.StartAsync(); } catch { Status.Text = L("polling"); }
+        hub.Reconnected += _ => Dispatcher.InvokeAsync(async () => await BackgroundRefresh()).Task.Unwrap();
+        try { await hub.StartAsync(); } catch { /* HTTP polling keeps the verified session usable. */ }
         LoginPanel.Visibility = Visibility.Collapsed; Workspace.Visibility = Visibility.Visible;
         StatisticsTab.Visibility = OwnerSettings.Visibility = value.IsAdmin ? Visibility.Visible : Visibility.Collapsed;
         AdminPanel.Visibility=value.IsAdmin && !PersonalHosting?Visibility.Visible:Visibility.Collapsed;
@@ -205,11 +204,13 @@ public partial class MainWindow : Window
         _ = FetchConfiguredModNames();
         RenderTiming(mine);
         OwnError.Text = mine?.Phase != "error" || mine.Error == null ? "" : L("actionFailed");
-        Status.Text = hub?.State==Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected?L("connected",session?.Name):L("polling");
+        Status.Text = L("connected",session?.Name);
         var error = (pool.Busy && pool.Host.Startup?.Stage is not (null or "hostFailed")?null:pool.Host.Error) ?? (mine?.Phase=="error"?mine.Error:null);
         if (pool.Host.Id == null && !pool.CanStart && pool.Host.Phase == "empty") { Status.Text=L("rentPaused"); ErrorPanel.Visibility=Visibility.Collapsed; }
         else if (error != null) { displayedPoolError=error;ErrorDetails.Text = error; ErrorPanel.Visibility = Visibility.Visible; Status.Text = L("actionFailed"); }
         else if(displayedPoolError!=null){if(ErrorDetails.Text==displayedPoolError){ErrorDetails.Clear();ErrorPanel.Visibility=Visibility.Collapsed;}displayedPoolError=null;}
+        // Finish the provider-specific presentation before any catalog request yields.
+        RenderHostingProvider();
     }
     private string? displayedPoolError;
     private void DisableActions() { RefreshPlayersButton.IsEnabled = PlayersPanel.IsEnabled = FilesRefreshButton.IsEnabled = DownloadFileButton.IsEnabled = SaveSettingsButton.IsEnabled = RestartMatchButton.IsEnabled = EndMatchButton.IsEnabled = RestartButton.IsEnabled = StartButton.IsEnabled = StopButton.IsEnabled = ReleaseButton.IsEnabled = ConfigButton.IsEnabled = ArchiveButton.IsEnabled = LogsButton.IsEnabled = CommandButton.IsEnabled = false; }

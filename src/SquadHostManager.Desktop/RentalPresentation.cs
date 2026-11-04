@@ -29,7 +29,7 @@ public partial class MainWindow
 
         var occupied=pool.OccupiedServers??pool.Instances.Count(i=>i.Phase!="stopped");
         var key=pool.Busy && h.Id==null ? "ordering" : h.Phase is "ordering" or "provisioning" or "preparing" ? h.Phase : h.Id==null?(r?.EndedAt!=null?"hostCancelled":"hostNotRented") : !h.Verified ? "hostConnectionLost" : h.Phase=="ready" ? "hostConnectedSimple" : h.Phase;
-        HostStatus.Text=L(key);
+        HostStatus.Text=hostingProvider?.Selected=="respawn"?"RespawnHost":L(key);
         var startup=h.Startup;
         RetryHostButton.Visibility=session?.IsAdmin==true && h.Id!=null && startup?.Stage=="hostFailed" && !pool.Busy?Visibility.Visible:Visibility.Collapsed;
         HostLivePanel.Visibility=startup!=null && (h.Id!=null || pool.Busy && startup.Stage!="hostReady") && (session?.IsAdmin==true || pool.Busy || startup.Stage=="hostFailed" || h.Id!=null && h.RentedByName==session?.Name)?Visibility.Visible:Visibility.Collapsed;
