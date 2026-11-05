@@ -6,6 +6,14 @@ using SquadHostManager.Service;
 namespace SquadHostManager.Tests;
 public class RespawnHostTests
 {
+    [Fact] public async Task ProviderRejectionIncludesBoundedMessageWithoutCredentials()
+    {
+        using var f=new Fixture();var key="rsp_"+new string('a',64);
+        using var http=new HttpClient(new Handler(r=>r.Method==HttpMethod.Get?Json("[{\"id\":1070,\"memory\":8192,\"priceHourly\":0.13324999}]"):Json(System.Text.Json.JsonSerializer.Serialize(new{message="Server limit reached; token="+key,password="private-secret"}),HttpStatusCode.BadRequest)));
+        using var api=new RespawnHost(f.Store,new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Respawn:Token",key}}).Build(),http);
+        var error=await Assert.ThrowsAsync<RespawnApiException>(()=>api.Rent(new(Guid.NewGuid(),1070,.13324999m,"eu"),default));
+        Assert.Contains("Server limit reached",error.Message);Assert.DoesNotContain(key,error.Message);Assert.DoesNotContain("private-secret",error.Message);Assert.False(api.Pending);
+    }
     private sealed class Handler(Func<HttpRequestMessage,HttpResponseMessage> send):HttpMessageHandler
     {protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(send(request));}
     private static HttpResponseMessage Json(string value,HttpStatusCode status=HttpStatusCode.OK)=>new(status){Content=new StringContent(value,Encoding.UTF8,"application/json")};

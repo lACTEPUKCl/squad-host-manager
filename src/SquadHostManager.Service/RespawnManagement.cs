@@ -143,7 +143,7 @@ public sealed partial class RespawnHost
             foreach(var v in variables.EnumerateArray())if((Text(v,"key")??"").Contains("RCON",StringComparison.OrdinalIgnoreCase)&&int.TryParse(Text(v,"value"),out var number))port=number;
         if(info.TryGetProperty("ports",out var ports)&&ports.ValueKind==JsonValueKind.Array)
             foreach(var p in ports.EnumerateArray())if((Text(p,"name")??Text(p,"label")??"").Contains("RCON",StringComparison.OrdinalIgnoreCase)&&p.TryGetProperty("port",out var n))port=n.GetInt32();
-        if(port==null && details is {} server && server.TryGetProperty("panelServer",out var panel) && panel.TryGetProperty("allocations",out var allocations))
+        if(details is {} server && server.TryGetProperty("panelServer",out var panel) && panel.TryGetProperty("allocations",out var allocations))
         {
             var line=rconConfig.ReplaceLineEndings("\n").Split('\n').Select(l=>l.Trim()).FirstOrDefault(l=>l.StartsWith("Port=",StringComparison.OrdinalIgnoreCase));
             if(int.TryParse(line?[5..],out var configured)&&allocations.EnumerateArray().Any(a=>a.GetProperty("port").GetInt32()==configured))port=configured;
@@ -154,21 +154,33 @@ public sealed partial class RespawnHost
         return new(uri.Host,uri.Port,port.Value,password);
     }
     public async Task<JsonElement> Details(string id,CancellationToken ct){Id(id);return await Send(HttpMethod.Get,$"/api/v1/servers/{id}?includePanelServer=true",null,ct);}
-    public async Task ConfigureRcon(string id,string password,CancellationToken ct)
+    public async Task ConfigureRcon(string id,string password,CancellationToken ct,TimeSpan? timeout=null)
     {
-        var details=await Details(id,ct);if(!details.TryGetProperty("panelServer",out var panel)||!panel.TryGetProperty("allocations",out var allocations))return;
-        var ports=allocations.EnumerateArray().Where(a=>!a.GetProperty("isPrimary").GetBoolean()).Select(a=>a.GetProperty("port").GetInt32()).ToList();
-        if(ports.Count==0)throw new InvalidOperationException("Провайдер не выделил порт для RCON.");
-        var config=Encoding.UTF8.GetString(await ReadFile(id,"/SquadGame/ServerConfig/Rcon.cfg",ct)).ReplaceLineEndings("\n");
-        string? Value(string key)=>config.Split('\n').Select(l=>l.Trim()).FirstOrDefault(l=>l.StartsWith(key+"=",StringComparison.OrdinalIgnoreCase))?[(key.Length+1)..].Trim();
-        var port=int.TryParse(Value("Port"),out var existing)&&ports.Contains(existing)?existing:ports[^1];
-        var secret=string.IsNullOrWhiteSpace(Value("Password"))?password:Value("Password")!;
+        var until=DateTimeOffset.UtcNow+(timeout??TimeSpan.FromSeconds(config.GetValue<int?>("Respawn:RconSetupTimeoutSeconds")??120));
+        List<int> ports=[];
+        while(true)
+        {
+            var details=await Details(id,ct);
+            if(details.TryGetProperty("panelServer",out var panel) && panel.ValueKind==JsonValueKind.Object && panel.TryGetProperty("allocations",out var allocations) && allocations.ValueKind==JsonValueKind.Array)
+                ports=allocations.EnumerateArray().Where(a=>a.TryGetProperty("isPrimary",out var primary) && primary.ValueKind==JsonValueKind.False && a.TryGetProperty("port",out var port) && port.TryGetInt32(out var n) && n is >0 and <=65535).Select(a=>a.GetProperty("port").GetInt32()).Distinct().Order().ToList();
+            if(ports.Count>0)break;
+            if(DateTimeOffset.UtcNow>=until)throw new TimeoutException("RespawnHost не предоставил выделенный порт RCON. Запуск игры не выполнен. Повторите запуск после обновления данных провайдера.");
+            await Task.Delay(TimeSpan.FromSeconds(2),ct);
+        }
+        var rconText=Encoding.UTF8.GetString(await ReadFile(id,"/SquadGame/ServerConfig/Rcon.cfg",ct)).TrimStart('\uFEFF').ReplaceLineEndings("\n");
+        static string? Value(string text,string key)=>text.Split('\n').Select(l=>l.Trim().Split('=',2)).Where(parts=>parts.Length==2 && parts[0].Trim().Equals(key,StringComparison.OrdinalIgnoreCase)).Select(parts=>parts[1].Trim().Trim('"')).LastOrDefault();
+        var port=int.TryParse(Value(rconText,"Port"),out var existing)&&ports.Contains(existing)?existing:ports[^1];
+        var secret=string.IsNullOrWhiteSpace(Value(rconText,"Password"))?password:Value(rconText,"Password")!;
+        if(string.IsNullOrWhiteSpace(secret) || secret.Length>1024 || secret.Any(char.IsControl))throw new InvalidOperationException("Не задан допустимый пароль RCON. Запуск игры не выполнен.");
+        rconText=System.Text.RegularExpressions.Regex.Replace(rconText,@"(?im)^[ \t]*(IP|Port|Password)[ \t]*=.*(?:\n|$)","");
         foreach(var (key,value) in new[]{("IP","0.0.0.0"),("Port",port.ToString()),("Password",secret)})
         {
-            var pattern=@"(?m)^\s*"+key+@"\s*=.*$";
-            config=System.Text.RegularExpressions.Regex.IsMatch(config,pattern)?System.Text.RegularExpressions.Regex.Replace(config,pattern,_=>key+"="+value):config+"\n"+key+"="+value+"\n";
+            rconText+="\n"+key+"="+value+"\n";
         }
-        await WriteFile(id,"/SquadGame/ServerConfig/Rcon.cfg",Encoding.UTF8.GetBytes(config),ct);
+        await WriteFile(id,"/SquadGame/ServerConfig/Rcon.cfg",Encoding.UTF8.GetBytes(rconText),ct);
+        var saved=Encoding.UTF8.GetString(await ReadFile(id,"/SquadGame/ServerConfig/Rcon.cfg",ct));
+        if(Value(saved,"IP")!="0.0.0.0" || Value(saved,"Port")!=port.ToString() || Value(saved,"Password")!=secret)
+            throw new IOException("Проверка сохранённого Rcon.cfg не пройдена. Запуск игры не выполнен.");
     }
     public async Task<JsonElement> Resources(string id,CancellationToken ct){Id(id);return await Send(HttpMethod.Get,$"/api/v1/servers/{id}/resource-utilization",null,ct);}
     public async Task ReinstallKeepingFiles(string id,CancellationToken ct){Id(id);await Send(HttpMethod.Post,$"/api/v1/servers/{id}/reinstall",new{keep_files=true},ct);}

@@ -31,10 +31,16 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
         {
             var plan=store.Load<RespawnAllocation>("respawn-plan-"+instance.OwnerId)??throw new InvalidOperationException("Выберите тариф RespawnHost перед созданием сервера.");
             var order=Guid.Parse(instance.Id);var response=store.Load<JsonElement?>("respawn-order-result-"+order);
+            var orderState=store.Load<string>("respawn-order-"+order);
+            if(response==null && orderState is null or "rejected")managed=await api.Reusable(instance.OwnerId,plan,ct);
+            if(managed!=null)store.Save("respawn-instance-"+instance.Id,managed with{ReservedPorts=instance.Ports});
+            else
+            {
             response??=await api.Rent(new(order,plan.PlanId,plan.HourlyPrice,plan.Region),ct);
             var body=response.Value.TryGetProperty("data",out var data)?data:response.Value;
             var uuid=body.GetProperty("panelUuid").GetString()!;if(!Guid.TryParse(uuid,out _))throw new IOException("Нет UUID арендованного сервера.");
             managed=new(uuid,instance.OwnerId,instance.Ports,plan);store.Save("respawn-instance-"+instance.Id,managed);
+            }
         }
         if(managed.OwnerId!=instance.OwnerId)throw new UnauthorizedAccessException("Сервер принадлежит другому пользователю.");
         var deadline=DateTimeOffset.UtcNow.AddMinutes(15);

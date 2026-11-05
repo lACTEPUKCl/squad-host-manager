@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using SquadHostManager.Core;
 namespace SquadHostManager.Service;
-public sealed class RespawnApiException(System.Net.HttpStatusCode status):InvalidOperationException($"RespawnHost: HTTP {(int)status}. Проверьте состояние в панели перед повтором.")
+public sealed class RespawnApiException(System.Net.HttpStatusCode status,string? detail=null):InvalidOperationException($"RespawnHost: HTTP {(int)status}. "+(detail??"Проверьте состояние в панели перед повтором."))
 {public System.Net.HttpStatusCode StatusCode{get;}=status;}
 
 public sealed partial class RespawnHost(Store store,IConfiguration config,HttpClient? transport=null,Func<string,CancellationToken,Task<IRespawnInstallMonitor>>? monitorFactory=null):IDisposable
@@ -21,7 +21,7 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
         if(authenticate){if(!Configured)throw new InvalidOperationException("Добавьте API-ключ RespawnHost.");request.Headers.Add("X-Api-Key",Token);}
         if(body!=null)request.Content=JsonContent.Create(body);
         using var response=await http.SendAsync(request,ct);
-        if(!response.IsSuccessStatusCode)throw new RespawnApiException(response.StatusCode);
+        if(!response.IsSuccessStatusCode)throw new RespawnApiException(response.StatusCode,await ErrorDetail(response,ct));
         if(response.StatusCode==System.Net.HttpStatusCode.NoContent)return JsonSerializer.SerializeToElement(new{});
         var text=await response.Content.ReadAsStringAsync(ct);
         if(string.IsNullOrWhiteSpace(text))return JsonSerializer.SerializeToElement(new{});
@@ -111,7 +111,7 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
         try{response=await Send(HttpMethod.Post,"/api/v1/servers/rent",new{game_short="squad",plan_id=request.PlanId,region=request.Region,billing_mode="hourly",instance_count=1,performance_tier="performance"},ct);}
         catch(RespawnApiException error) when(error.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.PaymentRequired or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.UnprocessableEntity or System.Net.HttpStatusCode.TooManyRequests)
         {
-            store.Save("respawn-order-"+request.RequestId,"rejected");store.Delete("respawn-pending-order");throw;
+            store.Save("respawn-order-"+request.RequestId,"rejected");store.Save("respawn-order-error-"+request.RequestId,error.Message);store.Delete("respawn-pending-order");throw;
         }
         var server=response.TryGetProperty("data",out var wrapped)?wrapped:response;
         if(!Guid.TryParse(Text(server,"panelUuid"),out _))throw new InvalidOperationException("Заказ отправлен. Проверьте его результат в панели RespawnHost.");

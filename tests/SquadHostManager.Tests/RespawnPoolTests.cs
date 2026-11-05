@@ -8,7 +8,7 @@ using SquadHostManager.Core;
 using SquadHostManager.Service;
 namespace SquadHostManager.Tests;
 
-public class RespawnPoolTests
+public partial class RespawnPoolTests
 {
     private sealed class Backend:HttpMessageHandler
     {
@@ -19,6 +19,7 @@ public class RespawnPoolTests
         {public Task Wait(CancellationToken ct)=>completion.Task.WaitAsync(ct);public ValueTask DisposeAsync()=>ValueTask.CompletedTask;}
         public readonly Dictionary<string,string> Files=new(){{"/SquadGame/ServerConfig/Server.cfg",SquadConfig.Initial},{"/SquadGame/ServerConfig/Rcon.cfg","Port=21114\nPassword=secret"},{"/SquadGame/Saved/Logs/SquadGame.log","server log"},{"/SquadGame/Saved/OSI_Scoreboards/result.json","{\"winner\":1}"}};
         public readonly List<string> Calls=[];
+        public bool RejectRental, LoseRentalResponse, MissingRconAllocations;
         public string Read(string path)=>servers[Uuid!].Files[path];
         public string Read(string uuid,string path)=>servers[uuid].Files[path];
         private sealed class Server {public string State="offline";public int Installing;public Dictionary<string,string> Files=[];}
@@ -29,7 +30,7 @@ public class RespawnPoolTests
         {
             var path=r.RequestUri!.AbsolutePath;lock(Calls)Calls.Add(r.Method+" "+path);
             if(path.EndsWith("/packages"))return Json(new[]{new{id=1070,memory=8192,priceHourly=0.13324999m}});
-            if(path.EndsWith("/servers/rent")){Rentals++;Uuid=Guid.NewGuid().ToString();servers[Uuid]=new(){Files=new(Files)};return Json(new{panelUuid=Uuid});}
+            if(path.EndsWith("/servers/rent")){if(RejectRental)return new(HttpStatusCode.BadRequest){Content=JsonContent.Create(new{message="Server limit reached"})};Rentals++;Uuid=Guid.NewGuid().ToString();servers[Uuid]=new(){Files=new(Files)};if(LoseRentalResponse)throw new HttpRequestException("Lost rent reply");return Json(new{panelUuid=Uuid});}
             if(path.EndsWith("/servers"))
             {
                 var rows=servers.Select(s=>new{panelUuid=s.Key,alias="Training",dockerState=s.Value.State=="installing"?"offline":s.Value.State}).ToArray();
@@ -43,6 +44,7 @@ public class RespawnPoolTests
             if(path.EndsWith("/powerstate")){var body=await r.Content!.ReadFromJsonAsync<JsonElement>(ct);current!.State=body.GetProperty("power_state").GetString()=="stop"?"offline":"running";return Json(new{});}
             if(path.EndsWith("/startup-information/en"))return Json(new{data=new[]{new{attributes=new{env_variable="WORKSHOP_IDS",server_value="",is_editable=true}}}});
             if(path.EndsWith("/connection-info"))return Json(new{connectionString="203.0.113.8:7787",variables=new[]{new{key="RCON_PORT",value="21114"}}});
+            if(path.EndsWith(uuid) && current!=null)return MissingRconAllocations?Json(new{}):Json(new{panelServer=new{allocations=new[]{new{port=7787,isPrimary=true},new{port=21114,isPrimary=false}}}});
             if(path.EndsWith("/resource-utilization")){var state=current!.State;if(current.Installing>0 && --current.Installing==0)current.State="offline";return Json(new{current_state=state,resources=new{cpu_absolute=92,memory_bytes=4L*1024*1024*1024,disk_bytes=1000000}});}
             var query=System.Web.HttpUtility.ParseQueryString(r.RequestUri.Query);
             if(path.EndsWith("/files/content")){var file=query["file"]!;return files.TryGetValue(file,out var text)?new(HttpStatusCode.OK){Content=new StringContent(text)}:new(HttpStatusCode.NotFound);}

@@ -46,6 +46,13 @@ public sealed class Store : IDisposable
         cmd.CommandText = "INSERT INTO documents VALUES ($id,$value) ON CONFLICT(id) DO UPDATE SET value=excluded.value";
         cmd.Parameters.AddWithValue("$id", id); cmd.Parameters.AddWithValue("$value", JsonSerializer.Serialize(value)); cmd.ExecuteNonQuery();
     }
+    public List<(string Id,T Value)> LoadPrefix<T>(string prefix)
+    {
+        using var db=Open();using var cmd=db.CreateCommand();cmd.CommandText="SELECT id,value FROM documents WHERE substr(id,1,length($prefix))=$prefix ORDER BY id";cmd.Parameters.AddWithValue("$prefix",prefix);
+        using var reader=cmd.ExecuteReader();var result=new List<(string,T)>();
+        while(reader.Read())result.Add((reader.GetString(0),JsonSerializer.Deserialize<T>(reader.GetString(1))??throw new InvalidOperationException("Повреждена сохранённая запись.")));
+        return result;
+    }
     public void Delete(string id){using var db=Open();using var cmd=db.CreateCommand();cmd.CommandText="DELETE FROM documents WHERE id=$id";cmd.Parameters.AddWithValue("$id",id);cmd.ExecuteNonQuery();}
     public static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     public static string Secret() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));

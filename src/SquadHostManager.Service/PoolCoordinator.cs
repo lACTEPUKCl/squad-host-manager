@@ -12,6 +12,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
     {
         var state=store.Load<PoolState>(stateKey)??new();
         if(fixedProvider!=null)state.Provider=fixedProvider;
+        RestoreRejectedRentals(store,state);
         foreach(var record in store.Load<List<RentalRecord>>("rental-history-import")??[])
             if(!state.Rentals.Any(r=>r.Id==record.Id))state.Rentals.Add(record);
         store.Save(stateKey,state);
@@ -210,7 +211,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         {
             var rental=state.Rentals.LastOrDefault(r=>r.Id==state.HostId)?.Copy() ?? (user.IsAdmin && state.HostId==null ? state.Rentals.LastOrDefault()?.Copy():null);
             if(!user.IsAdmin && rental!=null)rental=rental with{ProviderAmount=null,Rates=[]};
-            var error=user.IsAdmin?state.HostError:(state.HostPhase=="unavailable"?"Хост недоступен":null);
+            var error=store.Load<string>("last-rental-error-"+state.Provider+"-"+user.Id)??(user.IsAdmin?state.HostError:(state.HostPhase=="unavailable"?"Хост недоступен":null));
             var startup=state.Startup is {} current?current with{Events=current.Events.ToList(),Error=user.IsAdmin?current.Error:null}:null;
             var host=new HostView(state.HostId,state.Ip,state.HostPhase,error,state.RentedByName,state.ConnectedByName,rental,state.HostCheckedAt is {} checkedAt && DateTimeOffset.UtcNow-checkedAt<TimeSpan.FromSeconds(60) && state.HostReachable,startup);
             var instances=state.Instances.Where(i=>user.IsAdmin || i.OwnerId==user.Id).Select(i=>new InstanceView(i.Id,i.OwnerId,i.OwnerName,i.Name,i.Slot,i.Ports,i.Phase,i.OwnerId==user.Id,i.Error,i.GameState,i.DownloadPercent,i.MaxPlayers,i.Mods,i.StartedAt,QueuePosition(i.Id),i.OwnerId==user.Id?i.Password:null,i.StartLayer,i.ProgressKey,i.Address)).ToList();
@@ -259,6 +260,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
             RememberMods(user,request.Mods);
             inst.ReadyNotified=false; inst.StartedAt = DateTimeOffset.UtcNow; inst.MaxPlayers = Defaults(user).Configs?.TryGetValue("Server.cfg",out var commonMain)==true && int.TryParse(SquadConfig.Get(commonMain,"MaxPlayers"),out var commonPlayers)?commonPlayers:request.MaxPlayers; inst.Slot = slot; inst.Ports = PortSet.ForSlot(slot); inst.Phase = "queued"; inst.Error = null; inst.GameState = null; inst.DownloadPercent = null;
             var op = new Operation { Id = request.RequestId.ToString("N"), UserId = user.Id, InstanceId = inst.Id, Kind = "start", ExpectedHostId=state.HostId };
+            store.Delete("last-rental-error-"+state.Provider+"-"+user.Id);
             state.Operations.Add(op); state.LastEvent = $"{user.Name}: запуск {inst.Name} поставлен в очередь"; Save(); return View(op);
         }
     }
@@ -326,6 +328,8 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
                     var inst = state.Instances.Find(i => i.Id == op.InstanceId);
                     // Failed starts retain reservations: Docker may already have started.
                     if (inst != null && inst.Phase != "stopped") { inst.Phase = "error"; inst.Error = e.Message; }
+                    if(state.Provider=="respawn" && inst!=null && op.Kind=="start" && RejectedWithoutAllocation(store,inst))
+                    {ArchiveRejectedRental(store,inst);state.Instances.Remove(inst);Notify(inst.OwnerId,"noticeHostFailed",null,e.Message);}
                     state.LastEvent = "Ошибка: " + e.Message; Save();
                 }
             }
