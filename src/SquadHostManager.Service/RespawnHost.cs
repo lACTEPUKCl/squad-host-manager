@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using SquadHostManager.Core;
 namespace SquadHostManager.Service;
+internal sealed class RespawnAllocationDeletedException() : IOException("Сервер удалён в панели RespawnHost. Создайте новую аренду.") { }
 public sealed class RespawnApiException(System.Net.HttpStatusCode status,string? detail=null):InvalidOperationException($"RespawnHost: HTTP {(int)status}. "+(detail??"Проверьте состояние в панели перед повтором."))
 {public System.Net.HttpStatusCode StatusCode{get;}=status;}
 
@@ -59,16 +60,24 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
         {
             var data=await Send(HttpMethod.Get,$"/api/v1/servers?limit=100&page={page}",null,ct);
             var rows=data.GetProperty("data").EnumerateArray().ToList();
-            var transitions=store.Load<Dictionary<string,string>>("respawn-power-pending")??[];
+            var pageStates = new Dictionary<string,string>();
             foreach(var row in rows)
             {
                 var id=Text(row,"panelUuid")??throw new InvalidOperationException("RespawnHost: сервер без UUID.");
                 if(!Guid.TryParse(id,out _))throw new InvalidOperationException("RespawnHost: неверный UUID.");
                 var status=Text(row,"dockerState")??"unknown";
                 result.Add(new(id,Text(row,"alias")??id,status));
-                if(transitions.TryGetValue(id,out var target) && (target=="stop" && status is "offline" or "stopped" || target!="stop" && status=="running"))transitions.Remove(id);
+                pageStates[id] = status;
             }
-            store.Save("respawn-power-pending",transitions);
+            if (result.Select(s => s.Id).Distinct().Count() != result.Count)
+                throw new InvalidOperationException("RespawnHost: повторная страница серверов.");
+            ChangePending(transitions =>
+            {
+                foreach (var (id, status) in pageStates)
+                    if (transitions.TryGetValue(id, out var target) &&
+                        (target == "stop" ? status is "offline" or "stopped" : status == "running"))
+                        transitions.Remove(id);
+            });
             if(data.TryGetProperty("summary",out var summary)&&summary.TryGetProperty("total",out var total))
             {
                 if(total.GetInt32()<result.Count)throw new InvalidOperationException("RespawnHost: несогласованный список серверов.");
@@ -79,7 +88,7 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
                 if(rows.Count==0)throw new InvalidOperationException("RespawnHost: неполный список серверов.");
             }
             else if(rows.Count<100)return result;
-            if(result.Select(s=>s.Id).Distinct().Count()!=result.Count)throw new InvalidOperationException("RespawnHost: повторная страница серверов.");
+
         }
         throw new InvalidOperationException("Не удалось проверить весь список серверов RespawnHost.");
     }
@@ -115,7 +124,7 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
         }
         var server=response.TryGetProperty("data",out var wrapped)?wrapped:response;
         if(!Guid.TryParse(Text(server,"panelUuid"),out _))throw new InvalidOperationException("Заказ отправлен. Проверьте его результат в панели RespawnHost.");
-        var transitions=store.Load<Dictionary<string,string>>("respawn-power-pending")??[];transitions[Text(server,"panelUuid")!]="start";store.Save("respawn-power-pending",transitions);
+        ChangePending(transitions => transitions[Text(server,"panelUuid")!] = "start");
         store.Save("respawn-order-result-"+request.RequestId,response);
         store.Save("respawn-order-"+request.RequestId,"done");store.Delete("respawn-pending-order");return response;
     }
@@ -124,8 +133,28 @@ public sealed partial class RespawnHost(Store store,IConfiguration config,HttpCl
         if(!Guid.TryParse(id,out _))throw new ArgumentException("Неверный UUID сервера.");
         if(state is not ("start" or "stop" or "restart"))throw new ArgumentException("Неверное действие.");
         if(!(await Servers(ct)).Any(s=>s.Id==id))throw new UnauthorizedAccessException("Сервер недоступен этому аккаунту.");
-        var transitions=store.Load<Dictionary<string,string>>("respawn-power-pending")??[];transitions[id]=state;store.Save("respawn-power-pending",transitions);
-        await Send(HttpMethod.Post,$"/api/v1/servers/{id}/powerstate",new{power_state=state},ct);
+        string? previous = null;
+        ChangePending(pending => { previous = pending.GetValueOrDefault(id); pending[id] = state; });
+        try { await Send(HttpMethod.Post,$"/api/v1/servers/{id}/powerstate",new{power_state=state},ct); }
+        catch (RespawnApiException e) when ((int)e.StatusCode is 400 or 401 or 403 or 404 or 409 or 422 or 429)
+        {
+            ChangePending(pending =>
+            {
+                if (pending.GetValueOrDefault(id) != state) return;
+                if (previous == null) pending.Remove(id);
+                else pending[id] = previous;
+            });
+            throw;
+        }
+    }
+    private void ChangePending(Action<Dictionary<string,string>> change)
+    {
+        lock (store)
+        {
+            var pending = store.Load<Dictionary<string,string>>("respawn-power-pending") ?? [];
+            change(pending);
+            store.Save("respawn-power-pending", pending);
+        }
     }
     public void Dispose(){if(transport==null)http.Dispose();}
 }

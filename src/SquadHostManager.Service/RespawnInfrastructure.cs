@@ -27,6 +27,14 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
     {
         await ForgetSafe(instance.Id,ct);
         var managed=store.Load<RespawnManagedServer>("respawn-instance-"+instance.Id);
+        if (managed != null && !(await api.Servers(ct)).Any(s => s.Id == managed.Uuid))
+        {
+            try { await api.Details(managed.Uuid, ct); }
+            catch (RespawnApiException e) when (e.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new RespawnAllocationDeletedException();
+            }
+        }
         if(managed==null)
         {
             var plan=store.Load<RespawnAllocation>("respawn-plan-"+instance.OwnerId)??throw new InvalidOperationException("Выберите тариф RespawnHost перед созданием сервера.");
@@ -61,6 +69,7 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
         if(!string.IsNullOrWhiteSpace(instance.StartLayer))await Config(host,ip,instance.Id,new("LayerRotation.cfg",instance.StartLayer+"\n"),ct);
         await api.ConfigureRcon(managed.Uuid,instance.RconPassword,ct);
         await api.ApplyWorkshop(managed.Uuid,instance.Mods,ct);
+        await api.RemoveUnselectedWorkshopMods(managed.Uuid, instance.Mods, ct);
         await api.ApplyIdentity(managed.Uuid,instance,ct);
         await api.Alias(managed.Uuid,instance.Name,ct);
         RespawnMetering.Begin(store,instance,managed.Plan.HourlyPrice);
@@ -90,7 +99,18 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
         await api.ReinstallKeepingFiles(uuid,ct);
         using var installTimeout=CancellationTokenSource.CreateLinkedTokenSource(ct);installTimeout.CancelAfter(TimeSpan.FromMinutes(20));
         await monitor.Wait(installTimeout.Token);
-        _=await api.ReadFile(uuid,"/SquadGame/ServerConfig/Server.cfg",ct);
+        while (true)
+        {
+            try
+            {
+                _ = await api.ReadFile(uuid, "/SquadGame/ServerConfig/Server.cfg", installTimeout.Token);
+                break;
+            }
+            catch (HttpRequestException error) when (error.StatusCode == HttpStatusCode.Conflict)
+            {
+                await Task.Delay(2000, installTimeout.Token);
+            }
+        }
         await RestoreFiles(host,ip,instance.Id,path,ct);
         if(!string.IsNullOrWhiteSpace(license))await Config(host,ip,instance.Id,new("License.cfg",license),ct);
         store.Save("respawn-installed-mods-"+uuid,string.Join(' ',System.Text.RegularExpressions.Regex.Matches(instance.Mods,@"\d+").Select(m=>m.Value).Distinct()));
@@ -126,7 +146,7 @@ public sealed class RespawnInfrastructure(RespawnHost api,Store store,Func<Respa
             if(own.Map!=null && s.State=="running" && state.Instances.Find(i=>i.Id==own.Id) is {} instance)RespawnMetering.Begin(store,instance,own.Map.Plan.HourlyPrice);
             var pending=store.Load<Dictionary<string,string>>("respawn-power-pending")??[];
             var starting=pending.TryGetValue(s.Id,out var target)&&target!="stop";
-            return new RemoteInstance(own.Map==null?"external:"+s.Id:own.Id,starting || s.State is not ("offline" or "stopped"),own.Map?.ReservedPorts.All??[]);
+            return new RemoteInstance(own.Map==null?"external:"+s.Id:own.Id,starting || s.State is not ("offline" or "stopped"),own.Map?.ReservedPorts.All??[]) { StartConfirmed = s.State == "running" };
         }).ToList();
     }
     public Task<HashSet<int>> BoundPorts(string host,string ip,CancellationToken ct)=>Task.FromResult(new HashSet<int>());

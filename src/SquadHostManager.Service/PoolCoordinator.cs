@@ -251,6 +251,8 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
                 inst = state.Instances.Find(i => i.Id == request.InstanceId && i.OwnerId == user.Id) ?? throw new UnauthorizedAccessException("Можно запустить только свой сервер.");
                 if (inst.Phase != "stopped" || state.Operations.Any(o => o.InstanceId == inst.Id && o.Phase is "queued" or "running")) throw new InvalidOperationException("Сервер уже запущен или занят операцией.");
             }
+            if (state.Provider == "respawn" && inst == null && state.Instances.Any(i => i.OwnerId == user.Id && i.Phase != "stopped" && string.Equals(i.Name, request.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("У вас уже есть сервер RespawnHost с этим именем. Откройте его в разделе «Мои серверы».");
             EnforceQuota(user,inst);
             var slot = PortSet.Allocate(state.Instances.Where(Occupied).Select(i => i.Slot), [],state.CpuCapacity);
             if (inst == null) { inst = new Instance { OwnerId = user.Id, OwnerName = user.Name }; state.Instances.Add(inst); }
@@ -328,7 +330,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
                     var inst = state.Instances.Find(i => i.Id == op.InstanceId);
                     // Failed starts retain reservations: Docker may already have started.
                     if (inst != null && inst.Phase != "stopped") { inst.Phase = "error"; inst.Error = e.Message; }
-                    if(state.Provider=="respawn" && inst!=null && op.Kind=="start" && RejectedWithoutAllocation(store,inst))
+                    if(state.Provider=="respawn" && inst!=null && op.Kind=="start" && (RejectedWithoutAllocation(store,inst) || e is RespawnAllocationDeletedException))
                     {ArchiveRejectedRental(store,inst);state.Instances.Remove(inst);Notify(inst.OwnerId,"noticeHostFailed",null,e.Message);}
                     state.LastEvent = "Ошибка: " + e.Message; Save();
                 }
@@ -418,7 +420,7 @@ public sealed partial class PoolCoordinator(Store store, IInfrastructure infra, 
         lock(gate)state.CpuCapacity=cpuSets.Count;
         var inventory = await infra.Inventory(state.HostId!, state.Ip!, ct);
         var own = inventory.Find(i => i.Id == inst.Id);
-        if (own?.Running != true)
+        if (own?.StartConfirmed != true)
         {
             var bound = await infra.BoundPorts(state.HostId!, state.Ip!, ct);
             foreach (var item in inventory.Where(i => i.Id != inst.Id)) bound.UnionWith(item.Ports);

@@ -33,9 +33,31 @@ public sealed partial class RespawnHost
     public async Task WriteFileStream(string id,string path,Stream source,long length,CancellationToken ct)
     {
         Id(id);CheckPath(path);if(length>2L*1024*1024*1024)throw new ArgumentException("Р¤Р°Р№Р» Р±РѕР»СЊС€Рµ 2 GiB.");
-        using var request=new HttpRequestMessage(HttpMethod.Post,$"https://respawnhost.com/api/v1/servers/{id}/files/write?file="+Uri.EscapeDataString(path));request.Headers.Add("X-Api-Key",Token);
-        request.Content=new StreamContent(source);request.Content.Headers.ContentType=new("application/octet-stream");request.Content.Headers.ContentLength=length;
-        using var response=await http.SendAsync(request,ct);if(!response.IsSuccessStatusCode)throw new IOException($"RespawnHost files: HTTP {(int)response.StatusCode}.");
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite,
+            Share = FileShare.None, Options = FileOptions.DeleteOnClose };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        await using var spool = new FileStream(Path.Combine(store.DirectoryPath, "restore-" + Guid.NewGuid().ToString("N")), options);
+        await BackupFormat.Copy(source, spool, length, ct);
+        if (spool.Length != length) throw new IOException("Неполный файл архива.");
+        await spool.FlushAsync(ct);
+        for (int attempt = 0; ; attempt++)
+        {
+            spool.Position = 0;
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"https://respawnhost.com/api/v1/servers/{id}/files/write?file="+Uri.EscapeDataString(path));
+            request.Headers.Add("X-Api-Key",Token);
+            request.Content = new StreamContent(spool);
+            request.Content.Headers.ContentType = new("application/octet-stream");
+            request.Content.Headers.ContentLength = length;
+            try
+            {
+                using var response = await http.SendAsync(request,ct);
+                if (response.IsSuccessStatusCode) return;
+                if (response.StatusCode != HttpStatusCode.Conflict || attempt >= 15)
+                    throw new IOException($"RespawnHost files: HTTP {(int)response.StatusCode}.");
+            }
+            finally { request.Content = null; } // The next attempt uses the same seekable copy.
+            await Task.Delay(TimeSpan.FromSeconds(2),ct);
+        }
     }
     public async Task ApplyIdentity(string id,Instance instance,CancellationToken ct)
     {
@@ -122,15 +144,53 @@ public sealed partial class RespawnHost
             return(key,value,editable);
         }).ToList();
     }
-    public async Task ApplyWorkshop(string id,string mods,CancellationToken ct)
+    private static HashSet<string> WorkshopIds(string value)
     {
-        var ids=System.Text.RegularExpressions.Regex.Matches(mods,@"\d+").Select(m=>m.Value).Distinct().ToArray();
-        if(mods.Any(c=>!char.IsAsciiDigit(c)&&!char.IsWhiteSpace(c)&&c!=','))throw new ArgumentException("РќРµРґРѕРїСѓСЃС‚РёРјС‹Рµ Workshop ID.");
-        var variables=Variables(await Startup(id,ct));
-        var variable=variables.FirstOrDefault(v=>new[]{"MODS","MOD_IDS","WORKSHOP_IDS","WORKSHOP_MODS","STEAM_WORKSHOP_IDS","SQUAD_MODS","WORKSHOP_ITEMS"}.Contains(v.Key) && v.Editable);
-        if(variable.Key==null){if(ids.Length>0)throw new InvalidOperationException("RespawnHost РЅРµ РїСЂРµРґРѕСЃС‚Р°РІРёР» РЅР°СЃС‚СЂРѕР№РєСѓ Workshop РґР»СЏ СЌС‚РѕРіРѕ СЃРµСЂРІРµСЂР°. РњРѕРґС‹ РЅРµ РїСЂРёРјРµРЅРµРЅС‹.");return;}
-        var value=string.Join(variable.Key=="WORKSHOP_ITEMS" || variable.Value.Contains(',')?",":" ",ids);
-        await Send(HttpMethod.Put,$"/api/v1/servers/{id}/startup-variable",new{key=variable.Key,value,language="en"},ct);
+        if (value.Any(c => !char.IsAsciiDigit(c) && !char.IsWhiteSpace(c) && c != ','))
+            throw new ArgumentException("Недопустимые Workshop ID.");
+        return System.Text.RegularExpressions.Regex.Matches(value, @"[0-9]+").Select(m => m.Value).ToHashSet();
+    }
+
+    public async Task ApplyWorkshop(string id, string mods, CancellationToken ct)
+    {
+        var desired = WorkshopIds(mods);
+        string[] keys = ["MODS","MOD_IDS","WORKSHOP_IDS","WORKSHOP_MODS","STEAM_WORKSHOP_IDS","SQUAD_MODS","WORKSHOP_ITEMS"];
+        var candidates = Variables(await Startup(id, ct)).Where(v => keys.Contains(v.Key)).ToList();
+        var variable = candidates.FirstOrDefault(v => v.Editable);
+        if (variable.Key == null)
+        {
+            if (candidates.Count == 0 ? desired.Count == 0 : candidates.All(v => desired.SetEquals(WorkshopIds(v.Value)))) return;
+            throw new InvalidOperationException("RespawnHost не предоставил настройку Workshop для этого сервера. Моды не применены.");
+        }
+        if (desired.SetEquals(WorkshopIds(variable.Value))) return;
+        var separator = variable.Key == "WORKSHOP_ITEMS" || variable.Value.Contains(',') ? "," : " ";
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await Send(HttpMethod.Put, $"/api/v1/servers/{id}/startup-variable", new { key = variable.Key, value = string.Join(separator,desired), language = "en" }, ct);
+                break;
+            }
+            catch (RespawnApiException e) when (attempt < 5 && e.StatusCode == HttpStatusCode.BadRequest && e.Message.Contains("Failed to update startup variable", StringComparison.OrdinalIgnoreCase))
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            }
+        }
+        var saved = Variables(await Startup(id, ct)).FirstOrDefault(v => v.Key == variable.Key);
+        if (saved.Key == null || !desired.SetEquals(WorkshopIds(saved.Value)))
+            throw new IOException("RespawnHost не сохранил выбранные моды. Запуск остановлен.");
+    }
+    public async Task RemoveUnselectedWorkshopMods(string id, string selection, CancellationToken ct)
+    {
+        const string root = "/SquadGame/Plugins/Mods";
+        var folders = await ListFiles(id, "/SquadGame/Plugins", ct);
+        if (!folders.Any(f => f.Name == "Mods" && !f.File && !f.Symlink)) return;
+        var desired = WorkshopIds(selection);
+        var stale = (await ListFiles(id, root, ct)).Where(f => !f.File && !f.Symlink && f.Name.Length > 0 && f.Name.All(char.IsAsciiDigit) && !desired.Contains(f.Name)).Select(f => f.Name).ToArray();
+        if (stale.Length == 0) return;
+        await Send(HttpMethod.Post, $"/api/v1/servers/{id}/files/delete", new { root, files = stale }, ct);
+        if ((await ListFiles(id, root, ct)).Any(f => stale.Contains(f.Name)))
+            throw new IOException("RespawnHost РЅРµ СѓРґР°Р»РёР» РѕС‚РєР»СЋС‡С‘РЅРЅС‹Рµ РјРѕРґС‹. Р—Р°РїСѓСЃРє РѕСЃС‚Р°РЅРѕРІР»РµРЅ.");
     }
     public async Task<JsonElement> ConnectionInfo(string id,CancellationToken ct){Id(id);return await Send(HttpMethod.Get,$"/api/v1/servers/{id}/connection-info?lang=en",null,ct);}
     public static RespawnConnection ParseConnection(JsonElement info,string rconConfig,JsonElement? details=null)

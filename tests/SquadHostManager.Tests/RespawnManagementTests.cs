@@ -66,12 +66,42 @@ public class RespawnManagementTests
         Assert.All(calls,c=>Assert.Contains("file=%2FSquadGame%2FServerConfig%2FAdmins.cfg",c));
         await Assert.ThrowsAsync<ArgumentException>(()=>client.ReadFile(Id,"/SquadGame/../../secret",default));
     }
+    [Fact] public async Task RemovedWorkshopFoldersArePrunedWithoutTouchingBuiltInOrSelectedMods()
+    {
+        using var fixture = new Fixture();
+        bool deleted = false;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            if (request.Method == HttpMethod.Post)
+            {
+                var body = System.Text.Json.JsonDocument.Parse(request.Content!.ReadAsStringAsync().Result).RootElement;
+                Assert.Equal("/SquadGame/Plugins/Mods", body.GetProperty("root").GetString());
+                Assert.Equal(new[]{"22","33"}, body.GetProperty("files").EnumerateArray().Select(x => x.GetString()).ToArray());
+                deleted = true;
+                return Json("{}");
+            }
+            var directory = System.Web.HttpUtility.ParseQueryString(request.RequestUri!.Query)["directory"];
+            string[] names = directory == "/SquadGame/Plugins" ? ["Mods"] : deleted ? ["11","CanadianArmedForces"] : ["11","22","33","CanadianArmedForces"];
+            return Json(System.Text.Json.JsonSerializer.Serialize(new {data = names.Select(name => new {name, file=false})}));
+        }));
+        using var api = new RespawnHost(fixture.Store, Config(), http);
+        await api.RemoveUnselectedWorkshopMods(Id,"11",default);
+        Assert.True(deleted);
+    }
     [Fact] public async Task WorkshopSettingsUseActualProviderVariableAndRejectUnsupportedMods()
     {
-        using var f=new Fixture();int writes=0;using var http=new HttpClient(new Handler(r=>{if(r.Method==HttpMethod.Get)return Json("{\"data\":[{\"attributes\":{\"env_variable\":\"WORKSHOP_IDS\",\"server_value\":\"\",\"is_editable\":true}}]}");writes++;Assert.Contains("123 456",r.Content!.ReadAsStringAsync().Result);return Json("{}");}));
+        using var f=new Fixture();int writes=0;using var http=new HttpClient(new Handler(r=>{if(r.Method==HttpMethod.Get)return Json(System.Text.Json.JsonSerializer.Serialize(new {data=new[]{new {attributes=new {env_variable="WORKSHOP_IDS",server_value=writes==0?"":"123 456",is_editable=true}}}}));writes++;Assert.Contains("123 456",r.Content!.ReadAsStringAsync().Result);return Json("{}");}));
         using var client=new RespawnHost(f.Store,Config(),http);await client.ApplyWorkshop(Id,"123 456",default);Assert.Equal(1,writes);
         using var emptyHttp=new HttpClient(new Handler(_=>Json("{\"data\":[]}")));using var missing=new RespawnHost(f.Store,Config(),emptyHttp);
         await Assert.ThrowsAsync<InvalidOperationException>(()=>missing.ApplyWorkshop(Id,"123",default));
+    }
+    [Fact] public async Task IgnoredWorkshopRemovalBlocksStartup()
+    {
+        using var fixture = new Fixture();
+        using var http = new HttpClient(new Handler(r => r.Method == HttpMethod.Put ? Json("{}") :
+            Json("""{"variables":[{"envVariable":"WORKSHOP_ITEMS","serverValue":"11,22,33","isEditable":true}]}""")));
+        using var api = new RespawnHost(fixture.Store,Config(),http);
+        await Assert.ThrowsAsync<IOException>(() => api.ApplyWorkshop(Id,"11",default));
     }
     [Fact] public void ConnectionsNeverGuessOrUseConsoleAcknowledgementAsRconReply()
     {
@@ -86,7 +116,7 @@ public class RespawnManagementTests
         {
             if(r.Method==HttpMethod.Put){writes.Add(r.Content!.ReadAsStringAsync().Result);return Json("{}");}
             if(r.RequestUri!.AbsolutePath.EndsWith("/files"))return Json("""{"entries":{"total":2,"data":[{"name":"Logs","size":0,"directory":true,"file":false,"symlink":false},{"name":"sessionId.txt","size":36,"file":true,"symlink":false}]}}""");
-            return Json("""{"variables":[{"envVariable":"WORKSHOP_ITEMS","serverValue":"","isEditable":true},{"envVariable":"servername","serverValue":"","isEditable":true}]}""");
+            return Json("""{"variables":[{"envVariable":"WORKSHOP_ITEMS","serverValue":"","isEditable":true},{"envVariable":"servername","serverValue":"","isEditable":true}]}""".Replace("\"WORKSHOP_ITEMS\",\"serverValue\":\"\"",writes.Count==0?"\"WORKSHOP_ITEMS\",\"serverValue\":\"\"":"\"WORKSHOP_ITEMS\",\"serverValue\":\"123,456\""));
         }));
         using var client=new RespawnHost(f.Store,Config(),http);
         var entries=await client.ListFiles(Id,"/SquadGame/Saved",default);

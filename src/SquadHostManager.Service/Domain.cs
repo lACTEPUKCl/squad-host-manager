@@ -85,7 +85,10 @@ public sealed class Operation
     public string? Error { get; set; }
 }
 public record RemoteHost(string Id, string? Ip, bool Ready, RentalRecord? Rental = null);
-public record RemoteInstance(string Id, bool Running, int[] Ports);
+public record RemoteInstance(string Id, bool Running, int[] Ports)
+{
+    public bool StartConfirmed { get; init; } = Running;
+}
 public record GameStatus(string State, double? DownloadPercent = null, string? ProgressKey = null);
 public record LogPosition(long Offset,long Inode);
 public record LogBatch(string Text,Dictionary<string,LogPosition> Positions);

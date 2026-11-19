@@ -14,6 +14,17 @@ public class RespawnHostTests
         var error=await Assert.ThrowsAsync<RespawnApiException>(()=>api.Rent(new(Guid.NewGuid(),1070,.13324999m,"eu"),default));
         Assert.Contains("Server limit reached",error.Message);Assert.DoesNotContain(key,error.Message);Assert.DoesNotContain("private-secret",error.Message);Assert.False(api.Pending);
     }
+    [Fact] public async Task RefusedStartDoesNotLeaveAnOfflineServerStarting()
+    {
+        const string id = "38c16e5a-0188-43c5-bd80-91f2c0a587f2";
+        using var fixture = new Fixture();
+        using var http = new HttpClient(new Handler(r => r.Method == HttpMethod.Get
+            ? Json("""{"data":[{"panelUuid":"38c16e5a-0188-43c5-bd80-91f2c0a587f2","dockerState":"offline"}],"summary":{"total":1}}""")
+            : Json("{}", HttpStatusCode.Conflict)));
+        using var api = new RespawnHost(fixture.Store, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Respawn:Token","rsp_"+new string('a',64)}}).Build(), http);
+        await Assert.ThrowsAsync<RespawnApiException>(() => api.Power(id,"start",default));
+        Assert.False(await api.HasServers(default));
+    }
     private sealed class Handler(Func<HttpRequestMessage,HttpResponseMessage> send):HttpMessageHandler
     {protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(send(request));}
     private static HttpResponseMessage Json(string value,HttpStatusCode status=HttpStatusCode.OK)=>new(status){Content=new StringContent(value,Encoding.UTF8,"application/json")};

@@ -22,7 +22,7 @@ public partial class RespawnPoolTests
         public bool RejectRental, LoseRentalResponse, MissingRconAllocations;
         public string Read(string path)=>servers[Uuid!].Files[path];
         public string Read(string uuid,string path)=>servers[uuid].Files[path];
-        private sealed class Server {public string State="offline";public int Installing;public Dictionary<string,string> Files=[];}
+        private sealed class Server {public string State="offline";public int Installing;public string Mods="";public Dictionary<string,string> Files=[];}
         private readonly Dictionary<string,Server> servers=[];
         public string? Uuid;public string State=>servers.GetValueOrDefault(Uuid??"")?.State??"offline";public int Rentals;
         private static HttpResponseMessage Json(object value)=>new(HttpStatusCode.OK){Content=JsonContent.Create(value)};
@@ -42,7 +42,8 @@ public partial class RespawnPoolTests
             var files=current?.Files??Files;
             if(path.EndsWith("/reinstall")){Assert.True((await r.Content!.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("keep_files").GetBoolean());Assert.NotNull(Installation);current!.State="offline";current.Files.Remove("/SquadGame/Saved/Logs/SquadGame.log");Installation.SetResult();return Json(new{});}
             if(path.EndsWith("/powerstate")){var body=await r.Content!.ReadFromJsonAsync<JsonElement>(ct);current!.State=body.GetProperty("power_state").GetString()=="stop"?"offline":"running";return Json(new{});}
-            if(path.EndsWith("/startup-information/en"))return Json(new{data=new[]{new{attributes=new{env_variable="WORKSHOP_IDS",server_value="",is_editable=true}}}});
+            if(path.EndsWith("/startup-variable")){current!.Mods=(await r.Content!.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("value").GetString()!;return Json(new{});}
+            if(path.EndsWith("/startup-information/en"))return Json(new{data=new[]{new{attributes=new{env_variable="WORKSHOP_IDS",server_value=current?.Mods??"",is_editable=true}}}});
             if(path.EndsWith("/connection-info"))return Json(new{connectionString="203.0.113.8:7787",variables=new[]{new{key="RCON_PORT",value="21114"}}});
             if(path.EndsWith(uuid) && current!=null)return MissingRconAllocations?Json(new{}):Json(new{panelServer=new{allocations=new[]{new{port=7787,isPrimary=true},new{port=21114,isPrimary=false}}}});
             if(path.EndsWith("/resource-utilization")){var state=current!.State;if(current.Installing>0 && --current.Installing==0)current.State="offline";return Json(new{current_state=state,resources=new{cpu_absolute=92,memory_bytes=4L*1024*1024*1024,disk_bytes=1000000}});}
